@@ -2,22 +2,81 @@
 @tailwind components;
 @tailwind utilities;
 
+@import url('https://fonts.googleapis.com/css2?family=Cascadia+Mono:wght@400;500;600;700&display=swap');
+
 @layer utilities {
   .text-balance {
     text-wrap: balance;
   }
 }
 
+body {
+  font-family: var(--font-inter), sans-serif;
+  letter-spacing: -0.01em;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  transition: background-color 0.2s, color 0.2s;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+.font-heading,
+.card-title,
+.page-title {
+  font-family: 'Cascadia Mono', monospace;
+  letter-spacing: -0.03em;
+}
+
+.ui-label,
+button,
+nav,
+.badge,
+.caption,
+.font-ui {
+  font-family: var(--font-inter), sans-serif;
+  letter-spacing: 0.02em;
+}
+
 
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 0 0% 3.9%;
+    --bg-primary: #F5F0E8;
+    --bg-panel: #ffffff;
+    --text-primary: #111111;
+
+    /* Pillar Color Combos (bg, text) */
+    --combo-1-bg: #630700;
+    --combo-1-text: #FF97D0;
+    --combo-2-bg: #FF97D0;
+    --combo-2-text: #125603;
+    --combo-3-bg: #125603;
+    --combo-3-text: #FF97D0;
+    --combo-4-bg: #C3F380;
+    --combo-4-text: #7523B4;
+    --combo-5-bg: #7523B4;
+    --combo-5-text: #FAE170;
+    --combo-6-bg: #D13F13;
+    --combo-6-text: #FCC5C6;
+    --combo-7-bg: #F058AB;
+    --combo-7-text: #F1FFBA;
+    --combo-8-bg: #906713;
+    --combo-8-text: #FFDB58;
+    --combo-9-bg: #0D5072;
+    --combo-9-text: #7FEEFF;
+
+    /* Original shadcn/ui variables to prevent components from breaking entirely */
+    --background: 37 40% 93%;
+    /* HSL approximation of F5F0E8 */
+    --foreground: 0 0% 6.7%;
     --card: 0 0% 100%;
-    --card-foreground: 0 0% 3.9%;
+    --card-foreground: 0 0% 6.7%;
     --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 3.9%;
+    --popover-foreground: 0 0% 6.7%;
     --primary: 0 0% 9%;
     --primary-foreground: 0 0% 98%;
     --secondary: 0 0% 96.1%;
@@ -31,20 +90,21 @@
     --border: 0 0% 89.8%;
     --input: 0 0% 89.8%;
     --ring: 0 0% 3.9%;
-    --chart-1: 12 76% 61%;
-    --chart-2: 173 58% 39%;
-    --chart-3: 197 37% 24%;
-    --chart-4: 43 74% 66%;
-    --chart-5: 27 87% 67%;
     --radius: 0.5rem;
   }
+
   .dark {
-    --background: 0 0% 3.9%;
-    --foreground: 0 0% 98%;
-    --card: 0 0% 3.9%;
-    --card-foreground: 0 0% 98%;
-    --popover: 0 0% 3.9%;
-    --popover-foreground: 0 0% 98%;
+    --bg-primary: #111111;
+    --bg-panel: #1a1a1a;
+    --text-primary: #F5F0E8;
+
+    --background: 0 0% 6.7%;
+    --foreground: 37 40% 93%;
+    --card: 0 0% 10.2%;
+    /* #1a1a1a */
+    --card-foreground: 37 40% 93%;
+    --popover: 0 0% 10.2%;
+    --popover-foreground: 37 40% 93%;
     --primary: 0 0% 98%;
     --primary-foreground: 0 0% 9%;
     --secondary: 0 0% 14.9%;
@@ -58,10 +118,5 @@
     --border: 0 0% 14.9%;
     --input: 0 0% 14.9%;
     --ring: 0 0% 83.1%;
-    --chart-1: 220 70% 50%;
-    --chart-2: 160 60% 45%;
-    --chart-3: 30 80% 55%;
-    --chart-4: 280 65% 60%;
-    --chart-5: 340 75% 55%;
   }
 }

@@ -38,3 +38,11 @@ next-env.d.ts
 # Local env files
 .env
 
+# Local-only ad-hoc scripts (not shipped)
+/scripts-local/
+/check_*.js
+/test_*.js
+
+# Local agent config (not shipped)
+/.claude/
+

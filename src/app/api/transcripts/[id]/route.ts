@@ -29,12 +29,20 @@ export async function DELETE(
                 return NextResponse.json({ error: error.message }, { status: 500 });
             }
         } else {
-            // Fetch video ID first to delete it as well
+            // Fetch video_id — scoped to the requesting user — before cascading.
+            // Without the user_id filter, user A could trigger a cascade using
+            // user B's transcript id (if RLS were ever misconfigured).
             const { data: transcript } = await supabase
                 .from('transcripts')
                 .select('video_id')
                 .eq('id', id)
+                .eq('user_id', user.id)
                 .single();
+
+            if (!transcript) {
+                // Either not found or not owned by this user — do not leak which.
+                return NextResponse.json({ error: 'Not found' }, { status: 404 });
+            }
 
             // Delete the transcript
             const { error } = await supabase
@@ -48,8 +56,10 @@ export async function DELETE(
                 return NextResponse.json({ error: error.message }, { status: 500 });
             }
 
-            // Cleanup video row
-            if (transcript?.video_id) {
+            // Cleanup video + video_pillars. Video delete is user-scoped.
+            // video_pillars has no user_id column, but we just verified the video
+            // is owned by the requesting user, so deleting by video_id is safe.
+            if (transcript.video_id) {
                 await supabase.from('videos').delete().eq('id', transcript.video_id).eq('user_id', user.id);
                 await supabase.from('video_pillars').delete().eq('video_id', transcript.video_id);
             }

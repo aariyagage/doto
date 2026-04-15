@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server';
 import { writeFile, unlink, stat, readdir } from 'fs/promises';
-import { join } from 'path';
+import { extname, join } from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import { createClient } from '@/lib/supabase/server';
+import { requireEnv } from '@/lib/env';
+import { rateLimit, RATE_LIMITS } from '@/lib/rate-limit';
 import os from 'os';
 import fs from 'fs';
 import Groq from 'groq-sdk';
@@ -11,9 +13,31 @@ import ffmpegInstaller from '@ffmpeg-installer/ffmpeg';
 
 ffmpeg.setFfmpegPath(ffmpegInstaller.path);
 
+const ALLOWED_VIDEO_EXTENSIONS = new Set(['.mp4', '.mov', '.webm', '.m4v', '.mkv', '.avi']);
+const ALLOWED_VIDEO_MIME_PREFIXES = ['video/'];
+const MAX_FILE_SIZE_BYTES = 500 * 1024 * 1024; // 500MB — keep in sync with client.
+
+function safeVideoExtension(fileName: string): string {
+    const ext = extname(fileName).toLowerCase();
+    return ALLOWED_VIDEO_EXTENSIONS.has(ext) ? ext : '.mp4';
+}
+
+function isAcceptedVideoFile(file: File): boolean {
+    const ext = extname(file.name).toLowerCase();
+    if (!ALLOWED_VIDEO_EXTENSIONS.has(ext)) return false;
+    // file.type is client-controlled, so treat it as a hint, not the source of truth.
+    // We still reject blatantly non-video MIME types.
+    return !file.type || ALLOWED_VIDEO_MIME_PREFIXES.some((p) => file.type.startsWith(p));
+}
+
+// Route-level limits. maxDuration handles long-running pipeline on Vercel;
+// dynamic is required because we stream SSE.
+export const dynamic = 'force-dynamic';
+export const maxDuration = 300;
+
 export async function POST(request: Request) {
     const groq = new Groq({
-        apiKey: process.env.GROQ_API_KEY,
+        apiKey: requireEnv('GROQ_API_KEY'),
     });
 
     try {
@@ -26,6 +50,20 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'No file received' }, { status: 400 });
         }
 
+        if (file.size > MAX_FILE_SIZE_BYTES) {
+            return NextResponse.json(
+                { error: `File exceeds the maximum size of ${MAX_FILE_SIZE_BYTES / (1024 * 1024)}MB` },
+                { status: 413 }
+            );
+        }
+
+        if (!isAcceptedVideoFile(file)) {
+            return NextResponse.json(
+                { error: 'Unsupported file type. Allowed extensions: .mp4 .mov .webm .m4v .mkv .avi' },
+                { status: 415 }
+            );
+        }
+
         console.log("Initializing Supabase client...");
         const supabase = createClient();
         const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -33,6 +71,14 @@ export async function POST(request: Request) {
         if (authError || !user) {
             console.error("Supabase Auth Error:", authError?.message || "No user found");
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+
+        const rl = rateLimit({ key: `video-process:${user.id}`, ...RATE_LIMITS.videoProcess });
+        if (!rl.ok) {
+            return NextResponse.json(
+                { error: `Rate limit exceeded. Try again in ${rl.retryAfterSeconds}s.` },
+                { status: 429, headers: { 'Retry-After': String(rl.retryAfterSeconds) } }
+            );
         }
 
         const encoder = new TextEncoder();
@@ -54,8 +100,8 @@ export async function POST(request: Request) {
                     const tempDir = os.tmpdir();
                     const videoId = uuidv4();
 
-                    const originalExtension = file.name.substring(file.name.lastIndexOf('.')) || '.mp4';
-                    const videoPath = join(tempDir, `${videoId}-video${originalExtension}`);
+                    const safeExtension = safeVideoExtension(file.name);
+                    const videoPath = join(tempDir, `${videoId}-video${safeExtension}`);
                     tempFilesToCleanup.push(videoPath);
                     await writeFile(videoPath, buffer);
                     console.log(`Saved temp video to ${videoPath}`);
@@ -176,8 +222,7 @@ export async function POST(request: Request) {
 
                     // --- REAL EMBEDDING STEP (Non-Fatal) ---
                     try {
-                        const hfToken = process.env.HF_API_TOKEN;
-                        if (!hfToken) throw new Error("Missing HF_API_TOKEN");
+                        const hfToken = requireEnv('HF_API_TOKEN');
 
                         const { HfInference } = await import('@huggingface/inference');
                         const hf = new HfInference(hfToken);
@@ -260,11 +305,11 @@ export async function POST(request: Request) {
                                 messages: [
                                     {
                                         role: "system",
-                                        content: "You analyze a content creator's video transcripts to understand their unique voice and content themes. You are specific and personal. You never use generic descriptions. Everything you return must reflect THIS creator's actual words, topics, and style — not a generic creator. Return only valid JSON, no markdown, no explanation."
+                                        content: "You analyze a content creator's video transcripts to understand their unique voice, worldview, and content themes. You are specific and personal. You never use generic descriptions. Everything you return must reflect THIS creator's actual beliefs, words, topics, and style — not a generic creator. Return only valid JSON, no markdown, no explanation."
                                     },
                                     {
                                         role: "user",
-                                        content: `Here are transcripts from a content creator's videos:\n\n${combinedText}\n\nAnalyze them and return ONLY this JSON object:\n{\n  "pillars": [\n    {\n      "name": string (overarching content buckets, e.g. 'Mindset & Growth', 'Founder Diaries'. Avoid semantically similar duplicates like 'Mindset' and 'Mindset Shifts' - pick one. Keep words simple, max 1-3 words),\n      "description": string (one sentence)\n    }\n  ] (2-4 distinct pillars maximum),\n  "tone_descriptors": string[] (3-5 adjectives describing exactly how this person talks),\n  "recurring_phrases": string[] (up to 6 short phrases this creator repeats),\n  "content_style": string (exactly one of: story-driven, listicle, how-to, conversational, educational),\n  "niche_summary": string (1-2 sentences on what they make and who for)\n}`
+                                        content: `Here are transcripts from a content creator's videos:\n\n${combinedText}\n\nAnalyze them and return ONLY this JSON object:\n{\n  "pillars": [\n    {\n      "name": string (overarching content buckets, e.g. 'Mindset & Growth', 'Founder Diaries'. Avoid semantically similar duplicates like 'Mindset' and 'Mindset Shifts' - pick one. Keep words simple, max 1-3 words),\n      "description": string (one sentence)\n    }\n  ] (2-4 distinct pillars maximum),\n  "tone_descriptors": string[] (3-5 adjectives describing exactly how this person talks),\n  "recurring_phrases": string[] (up to 6 short phrases this creator repeats),\n  "content_style": string (exactly one of: story-driven, listicle, how-to, conversational, educational),\n  "niche_summary": string (1-2 sentences on what they make and who for),\n  "signature_argument": string (the contrarian belief or core thesis this creator returns to most often. One sentence. Must be specific enough that a different creator would disagree with it. Bad: 'Hard work matters.' Good: 'Most people optimize the wrong thing first — pricing, not product.'),\n  "enemy_or_foil": string[] (2-4 things, ideologies, or types of people this creator pushes back against. Examples: 'hustle culture', 'productivity gurus', 'corporate consultants who never built anything'),\n  "would_never_say": string[] (3 specific sentences this creator would never say out loud, given their worldview. Make these concrete sentences, not categories. Example: 'Just believe in yourself!')\n}`
                                     }
                                 ],
                                 temperature: 0.1,
@@ -285,6 +330,11 @@ export async function POST(request: Request) {
                             if (!profileData.pillars || !profileData.tone_descriptors || !profileData.recurring_phrases || !profileData.content_style || !profileData.niche_summary) {
                                 throw new Error("Missing required keys in Groq JSON response.");
                             }
+
+                            // T2 enrichment fields — non-fatal if missing (older transcripts may not surface a clear worldview)
+                            profileData.signature_argument = profileData.signature_argument || null;
+                            profileData.enemy_or_foil = Array.isArray(profileData.enemy_or_foil) ? profileData.enemy_or_foil : [];
+                            profileData.would_never_say = Array.isArray(profileData.would_never_say) ? profileData.would_never_say : [];
 
                             // 7. Handle Pillars
                             const P_COLORS = ['#E8F4B8', '#FFD6E8', '#C8E6FF', '#FFE8C8', '#E0D4FF', '#D4F4E8', '#FFF3D4', '#F4D4E8'];
@@ -330,16 +380,15 @@ export async function POST(request: Request) {
                                 recurring_phrases: profileData.recurring_phrases,
                                 content_style: profileData.content_style,
                                 niche_summary: profileData.niche_summary,
+                                signature_argument: profileData.signature_argument,
+                                enemy_or_foil: profileData.enemy_or_foil,
+                                would_never_say: profileData.would_never_say,
                                 last_updated: new Date().toISOString()
                             };
-
-                            console.log(`[DEBUG] Attempting voice_profile upsert with data:`, JSON.stringify(voiceProfileRecord, null, 2));
 
                             const upsertResponse = await supabase
                                 .from('voice_profile')
                                 .upsert(voiceProfileRecord, { onConflict: 'user_id' });
-
-                            console.log(`[DEBUG] Voice profile upsert response:`, JSON.stringify(upsertResponse, null, 2));
 
                             if (upsertResponse.error) throw new Error(`Failed to upsert voice profile: ${upsertResponse.error.message}`);
 
@@ -397,42 +446,55 @@ export async function POST(request: Request) {
                                 console.log(`Generating 5 background ideas for ${user.id}...`);
                                 const pillarNames = allPillarsList.map(p => p.name) || [];
 
-                                const ideaSystemMessage = "You are a creative content strategist who has deeply studied this specific creator's voice. You never produce generic ideas. Every idea must sound like it could only come from this creator using their exact language, stories, and approach. You post on Instagram Reels so hooks must be under 7 words and instantly grab attention. No self-help clichés. No advice that applies to every creator.";
+                                const ideaSystemMessage = `You are a creative content strategist who has deeply studied this specific creator's voice. You never produce generic ideas. Every idea must sound like it could only come from this creator using their exact language, stories, and approach.
+
+You MUST commit to a tension structure FIRST, then write the hook to match. Tension structures (these are SHAPE, not substance — fill them with this creator's specific stories, vocabulary, worldview):
+- reversal — example shape: "I did the opposite of what worked"
+- confession — example shape: "I lied to my best client"
+- specific_number — example shape: "$847 in 11 days"
+- contradiction — example shape: "Discipline ruined my life"
+- identity_challenge — example shape: "You're not actually a writer"
+- unexpected_outcome — example shape: "The wrong choice paid off"
+
+If you cannot hear this exact creator saying the hook out loud, rewrite it.
+
+Banned phrases (instant rejection — never use any of these or close variants): "this changed everything," "nobody talks about this," "I wish I knew this sooner," "game-changer," "let's dive in," "here's the thing," "the truth about," "what nobody tells you," "you won't believe," "secret to," "hack to."
+
+Anchor every idea on a real lived moment from the transcripts (specific stories, numbers, clients, mistakes the creator actually mentioned). Do not invent generic examples when the creator has given you real ones.`;
 
                                 const ideaUserMessage = `Creator voice profile:
 Niche: ${profileData.niche_summary}
 Tone: ${(profileData.tone_descriptors || []).join(", ")}
 Style: ${profileData.content_style}
 Phrases they actually say: ${(profileData.recurring_phrases || []).join(", ")}
+Signature argument (their core belief — every idea must depend on this being true): ${profileData.signature_argument || "(not yet identified)"}
+Enemy / foil (what they push back against): ${(profileData.enemy_or_foil || []).join(", ") || "(not yet identified)"}
+Things this creator would NEVER say (avoid the energy of these): ${(profileData.would_never_say || []).join(" | ") || "(none provided)"}
 
-Sample transcripts from their content:
+Sample transcripts from their content (mine these for real moments to anchor on):
 ${combinedText.substring(0, 4000)}
 
-Generate 5 Instagram Reel ideas for these content pillars: ${pillarNames.join(", ")}.
+Generate 5 Instagram Reel ideas distributed across these content pillars: ${pillarNames.join(", ")}. Aim for pillar balance — do not stack ideas in the most obvious pillar.
 
-Rules:
-- Generate BRAND NEW concepts or analogies that fit the chosen Pillar.
-- DO NOT just rehash or reuse the specific stories, analogies, or examples from the transcripts. The transcripts are ONLY provided so you can mimic the creator's tone, vocabulary, and speaking style, not to restrict the subject matter.
-- Hooks must be uniquely tailored to this creator's exact voice, highly creative, and undeniably interesting.
-- Hooks must be under 7 words
-- The hook must be a complete sentence the creator would literally say out loud as the first words of their Reel — not a description, not a summary, an actual spoken line
-- The hook must create overwhelming curiosity or tension in under 7 words — someone scrolling must want to stop and watch
-- Titles must be "real long titles" that are highly descriptive and engaging.
-- Provide a detailed "description" of the video concept that explains how the creator would uniquely execute it.
+CRITICAL CONSTRAINT: every idea must depend on the signature_argument being true. If a generic creator with a different worldview could make this same idea, it is wrong — rewrite it.
 
-Return ONLY a JSON array. No markdown. No explanation.
-Each object must follow this exact format:
+For EACH idea, fill the JSON fields in this exact order. You must commit to pillar and tension_type BEFORE writing the hook — this prevents lazy hooks.
 
-[
-  {
-    "title": "Descriptive, engaging, long-form title",
-    "hook": "Spoken line under 7 words",
-    "structure": "Step 1 → Step 2 → Step 3",
-    "pillar": "Exact pillar name from the list provided",
-    "description": "Concepts, tone instructions, and why this works for this creator."
-  }
-]
-Note: You MUST use an EXACT pillar name from the list provided above: ${pillarNames.join(", ")}`
+Field order and rules:
+1. pillar — exact name from this list: ${pillarNames.join(", ")}
+2. tension_type — one of: reversal | confession | specific_number | contradiction | identity_challenge | unexpected_outcome
+3. anchor_moment — one short sentence quoting or paraphrasing the specific transcript moment this idea is built on (proves you read the transcripts)
+4. hook — the literal first sentence the creator would say out loud. MUST use the tension_type committed above. MUST be ≤ 6 words. MUST contain at least one of: a proper noun, a number, or a first-person verb (I/we/my).
+5. hook_word_count — integer count of words in your hook. If > 6, rewrite the hook before continuing.
+6. format — one of: talking-head | text-on-screen | B-roll with VO | hybrid
+7. structure — Hook (0-2s) → Pattern interrupt (3-8s) → 2-3 body beats with tension → Payoff that closes the loop the hook opened
+8. retention_beat — the specific mid-video moment designed to re-hook viewers about to scroll
+9. cta — the specific end action (save / comment / follow / DM / share) and why it fits this idea
+10. title — long-form, descriptive, engaging
+11. description — how the creator would uniquely execute this, anchored on the anchor_moment and their voice
+
+Return ONLY a JSON object with this exact shape:
+{ "ideas": [ { ...all fields above... }, ... ] }`
 
                                 const ideaCompletion = await groq.chat.completions.create({
                                     model: "llama-3.3-70b-versatile",
@@ -440,7 +502,8 @@ Note: You MUST use an EXACT pillar name from the list provided above: ${pillarNa
                                         { role: "system", content: ideaSystemMessage },
                                         { role: "user", content: ideaUserMessage }
                                     ],
-                                    temperature: 0.7
+                                    temperature: 0.85,
+                                    response_format: { type: "json_object" }
                                 });
 
                                 let ideaContent = ideaCompletion.choices[0]?.message?.content || "[]";
@@ -455,12 +518,20 @@ Note: You MUST use an EXACT pillar name from the list provided above: ${pillarNa
                                 for (const idea of ideasData) {
                                     const cleanIdeaPillar = idea.pillar?.trim().toLowerCase() || "";
                                     const matchedPillar = allPillarsList.find(p => p.name.trim().toLowerCase() === cleanIdeaPillar);
+                                    const reasoningParts = [
+                                        idea.description || idea.reasoning,
+                                        idea.tension_type ? `Tension: ${idea.tension_type}` : null,
+                                        idea.anchor_moment ? `Anchor moment: ${idea.anchor_moment}` : null,
+                                        idea.format ? `Format: ${idea.format}` : null,
+                                        idea.retention_beat ? `Retention beat: ${idea.retention_beat}` : null,
+                                        idea.cta ? `CTA: ${idea.cta}` : null,
+                                    ].filter(Boolean);
                                     await supabase.from('content_ideas').insert({
                                         user_id: user.id,
                                         title: idea.title,
                                         hook: idea.hook,
                                         structure: idea.structure,
-                                        reasoning: idea.description || idea.reasoning,
+                                        reasoning: reasoningParts.join("\n\n"),
                                         pillar_id: matchedPillar ? matchedPillar.id : null,
                                         is_saved: false,
                                         is_used: false
@@ -481,8 +552,9 @@ Note: You MUST use an EXACT pillar name from the list provided above: ${pillarNa
                     const { error: updateError4 } = await supabase.from('videos').update({ status: 'done' }).eq('id', videoId);
                     if (updateError4) throw new Error(`DB Update Error: ${updateError4.message}`);
 
-                    // Provide transcript directly in stream or allow UI to handle fetching
-                    sendEvent({ step: 'done', video_id: videoId, transcript: fullTranscriptText });
+                    // Client fetches the transcript from DB after this event, so we
+                    // do not stream it again over the wire.
+                    sendEvent({ step: 'done', video_id: videoId });
                     controller.close();
                 } catch (err) {
                     console.error('Processing error:', err);

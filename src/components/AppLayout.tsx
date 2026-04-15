@@ -4,23 +4,10 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { Moon, Sun } from 'lucide-react'
+import { getCombo } from '@/lib/colors'
 
-// Combo definitions for cycling
-export const PILLAR_COLORS = [
-    { bg: '#630700', text: '#FF97D0' }, // 1: Blood Red
-    { bg: '#FF97D0', text: '#125603' }, // 2: Pastel Magenta
-    { bg: '#125603', text: '#FF97D0' }, // 3: Lincoln Green
-    { bg: '#C3F380', text: '#7523B4' }, // 4: Light Lime
-    { bg: '#7523B4', text: '#FAE170' }, // 5: Grape
-    { bg: '#D13F13', text: '#FCC5C6' }, // 6: Sinopia
-    { bg: '#F058AB', text: '#F1FFBA' }, // 7: Baby Pink
-    { bg: '#906713', text: '#FFDB58' }, // 8: Golden Brown
-    { bg: '#0D5072', text: '#7FEEFF' }, // 9: Dark Cerulean
-]
-
-export function getCombo(index: number) {
-    return PILLAR_COLORS[index % PILLAR_COLORS.length]
-}
+// Re-export for backwards compatibility with existing imports
+export { PILLAR_COLORS, getPairedTextColor } from '@/lib/colors'
 
 const TABS = [
     { label: 'Dashboard', path: '/dashboard' },
@@ -64,7 +51,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             <div className="absolute top-4 right-4 md:top-8 md:right-8 z-50">
                 <button
                     onClick={toggleTheme}
-                    className="p-2 rounded-full border border-gray-300 dark:border-gray-700 bg-[var(--bg-panel)] shadow-sm hover:scale-105 transition-transform"
+                    className="p-2 rounded-full border border-[var(--border-manila)] bg-[var(--bg-panel)] shadow-sm hover:scale-105 transition-transform"
                     aria-label="Toggle Dark Mode"
                 >
                     {isDarkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
@@ -84,11 +71,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                                 key={tab.path}
                                 href={tab.path}
                                 className={`
-                  relative px-6 py-3 rounded-t-lg border-t border-l border-r border-[#e5e7eb] dark:border-[#333]
-                  font-heading text-sm md:text-base whitespace-nowrap -ml-2 first:ml-0 transition-all
+                  relative px-6 py-3 rounded-t-lg border-t border-l border-r border-[var(--border-manila)]
+                  font-heading uppercase tracking-[0.14em] text-[11px] md:text-xs whitespace-nowrap -ml-2 first:ml-0 transition-all
                   ${isActive
-                                        ? 'z-20 bg-[var(--bg-panel)] font-bold pb-4 border-b-transparent translate-y-[1px]'
-                                        : 'z-10 bg-black/5 dark:bg-white/5 text-gray-500 dark:text-gray-400 hover:bg-[var(--bg-panel)] hover:z-15 hover:text-inherit'
+                                        ? 'z-20 bg-[var(--bg-panel)] font-bold pb-4 border-b-transparent translate-y-[1px] text-[var(--text-primary)]'
+                                        : 'z-10 bg-[var(--border-manila-soft)] text-[var(--text-primary)]/55 hover:bg-[var(--bg-panel)] hover:z-20 hover:text-[var(--text-primary)]'
                                     }
                 `}
                                 style={{
@@ -97,9 +84,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                                     marginTop: isActive ? '-2px' : '0'
                                 }}
                             >
-                                {/* Folder corner notch effect */}
-                                <div className="absolute top-0 left-0 w-2 h-2 rounded-tl-lg bg-transparent border-t border-l border-[#e5e7eb] dark:border-[#333] -mt-[1px] -ml-[1px] hidden"></div>
-
                                 {tab.label}
                             </Link>
                         )
@@ -107,7 +91,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 </nav>
 
                 {/* Content Panel Area */}
-                <main className="w-full bg-[var(--bg-panel)] border border-[#e5e7eb] dark:border-[#333] rounded-b-xl rounded-tr-xl shadow-lg relative z-0 min-h-[70vh] p-6 md:p-10 mb-20 overflow-hidden">
+                <main className="w-full bg-[var(--bg-panel)] border border-[var(--border-manila)] rounded-b-xl rounded-tr-xl shadow-[0_12px_40px_-12px_rgba(60,45,20,0.18)] relative z-0 min-h-[70vh] p-6 md:p-10 mb-20 overflow-hidden">
                     {children}
                 </main>
 

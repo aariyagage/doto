@@ -1,11 +1,21 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { Inter, Onest } from "next/font/google";
 import "./globals.css";
+import { ToastProvider } from "@/components/toast";
+import { UploadProvider } from "@/components/upload-context";
 
 const inter = Inter({ subsets: ["latin"], variable: '--font-inter' });
+const onest = Onest({
+  subsets: ["latin"],
+  weight: ["300", "400", "500", "600", "700"],
+  variable: '--font-caslon',
+});
 
 export const metadata: Metadata = {
-  title: "Doto - Your Voice",
+  title: {
+    default: "doto — Your Voice",
+    template: "%s · doto",
+  },
   description: "Your brain, quantified via AI.",
 };
 
@@ -17,9 +27,13 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${inter.variable} font-sans antialiased`}
+        className={`${inter.variable} ${onest.variable} font-sans antialiased`}
       >
-        {children}
+        <ToastProvider>
+          <UploadProvider>
+            {children}
+          </UploadProvider>
+        </ToastProvider>
       </body>
     </html>
   );

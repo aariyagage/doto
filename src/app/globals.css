@@ -1,13 +1,29 @@
+@import url('https://fonts.googleapis.com/css2?family=Cascadia+Mono:wght@400;500;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-
-@import url('https://fonts.googleapis.com/css2?family=Cascadia+Mono:wght@400;500;600;700&display=swap');
 
 @layer utilities {
   .text-balance {
     text-wrap: balance;
   }
+
+  .hide-scrollbar {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .hide-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* Universal keyboard focus ring — elements that set their own focus-visible
+   utilities (e.g. focus-visible:ring-*) override this via higher specificity. */
+*:focus-visible {
+  outline: 2px solid var(--text-primary);
+  outline-offset: 2px;
+  border-radius: 4px;
 }
 
 body {
@@ -41,12 +57,24 @@ nav,
   letter-spacing: 0.02em;
 }
 
+/* .font-caslon is a legacy class name; it now maps to Onest for the
+   editorial accent role (subtitles, pull-quotes, helper copy). */
+.font-caslon {
+  font-family: var(--font-caslon), 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  font-style: normal;
+  letter-spacing: -0.005em;
+}
+
 
 
 @layer base {
   :root {
     --bg-primary: #F5F0E8;
-    --bg-panel: #ffffff;
+    --bg-panel: #FDFAF4;
+    --bg-panel-strong: #FFFBF2;
+    --border-manila: #D4C9A8;
+    --border-manila-soft: rgba(212, 201, 168, 0.5);
+    --skeleton: #E8E0CC;
     --text-primary: #111111;
 
     /* Pillar Color Combos (bg, text) */
@@ -96,6 +124,10 @@ nav,
   .dark {
     --bg-primary: #111111;
     --bg-panel: #1a1a1a;
+    --bg-panel-strong: #222222;
+    --border-manila: #3a3530;
+    --border-manila-soft: rgba(58, 53, 48, 0.6);
+    --skeleton: #2a2620;
     --text-primary: #F5F0E8;
 
     --background: 0 0% 6.7%;

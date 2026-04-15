@@ -12,7 +12,21 @@ export async function GET() {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        // Fetch user data across tables
+        // First round: the user's video IDs are needed to scope video_pillars.
+        // Running this first lets the remaining 8 queries fan out in parallel.
+        const { data: userVideoRows, error: videosErr } = await supabase
+            .from('videos')
+            .select('id')
+            .eq('user_id', user.id);
+        if (videosErr) throw new Error(`Failed to fetch user videos: ${videosErr.message}`);
+
+        const userVideoIds = (userVideoRows || []).map(v => v.id);
+
+        const videoPillarsQuery = userVideoIds.length > 0
+            ? supabase.from('video_pillars').select('video_id, pillar_id').in('video_id', userVideoIds)
+            : Promise.resolve({ data: [] as { video_id: string; pillar_id: string }[] });
+
+        // Second round: all 8 queries run concurrently.
         const [
             { count: totalVideos },
             { count: totalIdeas },
@@ -30,9 +44,9 @@ export async function GET() {
             supabase.from('content_ideas').select('*', { count: 'exact', head: true }).eq('user_id', user.id).eq('is_saved', true),
             supabase.from('pillars').select('id, name, color').eq('user_id', user.id),
             supabase.from('content_ideas').select('pillar_id').eq('user_id', user.id),
-            supabase.from('video_pillars').select('video_id, pillar_id').in('video_id', (await supabase.from('videos').select('id').eq('user_id', user.id)).data?.map(v => v.id) || []),
+            videoPillarsQuery,
             supabase.from('videos').select('id, file_name, created_at').eq('user_id', user.id).order('created_at', { ascending: false }).limit(3),
-            supabase.from('content_ideas').select('id, title, created_at').eq('user_id', user.id).order('created_at', { ascending: false }).limit(3),
+            supabase.from('content_ideas').select('id, title, generated_at').eq('user_id', user.id).order('generated_at', { ascending: false }).limit(3),
         ]);
 
         // Aggregate chart data
@@ -50,7 +64,7 @@ export async function GET() {
         // Combine and sort recent activity
         const combinedActivity = [
             ...(recentVideos || []).map(v => ({ type: 'video', id: v.id, title: v.file_name, date: v.created_at, icon: 'video' })),
-            ...(recentIdeas || []).map(i => ({ type: 'idea', id: i.id, title: i.title, date: i.created_at, icon: 'lightbulb' }))
+            ...(recentIdeas || []).map(i => ({ type: 'idea', id: i.id, title: i.title, date: i.generated_at, icon: 'lightbulb' }))
         ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 5);
 
         return NextResponse.json({

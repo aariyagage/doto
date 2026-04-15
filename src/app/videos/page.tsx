@@ -2,10 +2,12 @@
 
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { Trash2, PlaySquare, Calendar } from 'lucide-react'
+import { Trash2, Calendar } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
-import AppLayout from '@/components/AppLayout'
+import AppLayout, { getPairedTextColor } from '@/components/AppLayout'
+import { useToast } from '@/components/toast'
+import Folder from '@/components/Folder'
 
 interface Pillar {
     id: string;
@@ -26,34 +28,35 @@ interface Transcript {
     videos?: { file_name: string };
     attachedPillars?: Pillar[];
     isDeleting?: boolean;
+    hardDeleteArmed?: boolean;
 }
 
 export default function VideoLibraryPage() {
     const supabase = createClient()
+    const { showToast } = useToast()
     const [transcripts, setTranscripts] = useState<Transcript[]>([])
     const [isLoading, setIsLoading] = useState(true)
-    const [toasts, setToasts] = useState<{ id: string, message: string }[]>([])
 
     // Fetch initial data
     useEffect(() => {
         const loadData = async () => {
             setIsLoading(true)
 
-            // Fetch pillars
+            const { data: { user } } = await supabase.auth.getUser()
+            if (!user) {
+                setIsLoading(false)
+                return
+            }
+
+            // Fetch pillars (owned by this user)
             const { data: pillarsData } = await supabase
                 .from('pillars')
                 .select('*')
+                .eq('user_id', user.id)
 
             const pillars: Pillar[] = pillarsData || [];
 
-            // Fetch video pillars mapping
-            const { data: vpData } = await supabase
-                .from('video_pillars')
-                .select('*')
-
-            const videoPillars: VideoPillar[] = vpData || [];
-
-            // Fetch transcripts with video filenames
+            // Fetch this user's transcripts with the joined video filenames
             const { data: tsData, error } = await supabase
                 .from('transcripts')
                 .select(`
@@ -63,15 +66,16 @@ export default function VideoLibraryPage() {
                     created_at,
                     videos ( file_name )
                 `)
+                .eq('user_id', user.id)
                 .or('is_hidden.is.null,is_hidden.eq.false')
                 .order('created_at', { ascending: false })
 
-            console.log('--- DEBUG FETCH ---');
-            console.log('Session User:', (await supabase.auth.getSession()).data.session?.user?.id)
-            console.log('tsData Error:', error);
-            console.log('tsData raw:', tsData);
-            console.log('vpData raw:', vpData);
-            console.log('pillars raw:', pillars);
+            // video_pillars has no user_id column — scope by video_ids the user owns.
+            const userVideoIds = (tsData || []).map(t => t.video_id);
+            const { data: vpData } = userVideoIds.length > 0
+                ? await supabase.from('video_pillars').select('*').in('video_id', userVideoIds)
+                : { data: [] };
+            const videoPillars: VideoPillar[] = vpData || [];
 
             if (!error && tsData) {
                 // Map the resolved pillars to each transcript
@@ -94,17 +98,11 @@ export default function VideoLibraryPage() {
         loadData()
     }, [supabase])
 
-    const showToast = (message: string) => {
-        const id = Math.random().toString()
-        setToasts(prev => [...prev, { id, message }])
-        setTimeout(() => {
-            setToasts(prev => prev.filter(t => t.id !== id))
-        }, 3000)
-    }
-
     const confirmDelete = async (id: string, type: 'soft' | 'hard') => {
         try {
             const { data: sessionData } = await supabase.auth.getSession()
+            // getSession() is correct here — we only need the JWT to attach to the
+            // request; the server revalidates with getUser() before acting.
             const token = sessionData.session?.access_token
 
             const res = await fetch(`/api/transcripts/${id}?type=${type}`, {
@@ -113,13 +111,13 @@ export default function VideoLibraryPage() {
             })
             if (res.ok) {
                 setTranscripts(prev => prev.filter(t => t.id !== id))
-                showToast(type === 'soft' ? "Video hidden from library" : "Video completely wiped")
+                showToast(type === 'soft' ? "Video hidden from library" : "Video permanently deleted", 'success')
             } else {
                 throw new Error("Failed to delete")
             }
         } catch {
-            showToast("Failed to delete transcript")
-            setTranscripts(prev => prev.map(t => t.id === id ? { ...t, isDeleting: false } : t))
+            showToast("Failed to delete transcript", 'error')
+            setTranscripts(prev => prev.map(t => t.id === id ? { ...t, isDeleting: false, hardDeleteArmed: false } : t))
         }
     }
 
@@ -130,7 +128,7 @@ export default function VideoLibraryPage() {
                     <div className="w-full max-w-7xl mx-auto space-y-8">
                         {/* Top Bar */}
                         <div className="flex items-center justify-between mb-8">
-                            <h1 className="text-3xl md:text-5xl font-heading tracking-tight text-gray-900 dark:text-white">Video Library</h1>
+                            <h1 className="text-2xl md:text-4xl font-heading uppercase tracking-tight text-[var(--text-primary)]">Video Library</h1>
                             <Link href="/upload">
                                 <Button
                                     className="bg-[var(--text-primary)] text-[var(--bg-primary)] hover:scale-105 transition-all font-heading rounded-full px-5 py-5 shadow-sm"
@@ -144,21 +142,19 @@ export default function VideoLibraryPage() {
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                             {isLoading && (
                                 Array.from({ length: 6 }).map((_, i) => (
-                                    <div key={`loading-${i}`} className="h-64 rounded-2xl bg-gray-100 dark:bg-gray-800 animate-pulse w-full"></div>
+                                    <div key={`loading-${i}`} className="h-64 rounded-2xl bg-[var(--skeleton)] animate-pulse w-full"></div>
                                 ))
                             )}
 
                             {!isLoading && transcripts.length === 0 && (
-                                <div className="col-span-full flex flex-col items-center justify-center py-24 text-center">
-                                    <div className="bg-blue-50 p-4 rounded-full mb-4 flex items-center justify-center">
-                                        <PlaySquare className="h-12 w-12 text-blue-500" />
-                                    </div>
-                                    <h3 className="text-xl font-bold font-heading text-gray-900 dark:text-white mb-2">No videos yet</h3>
-                                    <p className="text-[var(--muted-foreground)] mb-6 max-w-sm font-ui">
-                                        Upload videos to automatically generate transcripts, track your content pillars, and build your voice profile.
+                                <div className="col-span-full flex flex-col items-center justify-center py-16 md:py-24 text-center">
+                                    <Folder color="var(--combo-3-bg)" size="sm" tilt={-3} />
+                                    <h3 className="text-xl font-heading tracking-tight text-[var(--text-primary)] mt-6 mb-2 uppercase">An empty shelf</h3>
+                                    <p className="font-caslon italic text-lg text-[var(--text-primary)]/70 mb-6 max-w-sm">
+                                        Upload a video to start filling your library. We&rsquo;ll transcribe it, tag it to a pillar, and file it here.
                                     </p>
                                     <Link href="/upload">
-                                        <Button className="bg-[var(--text-primary)] text-[var(--bg-primary)] rounded-full px-6 transition-transform hover:scale-105 font-heading">
+                                        <Button className="bg-[var(--text-primary)] text-[var(--bg-primary)] rounded-full px-6 transition-transform hover:scale-105 font-ui">
                                             Upload your first video
                                         </Button>
                                     </Link>
@@ -169,17 +165,20 @@ export default function VideoLibraryPage() {
                                 const mainColor = transcript.attachedPillars?.[0]?.color || '#9ca3af';
 
                                 return (
-                                    <div key={transcript.id} className="relative flex flex-col rounded-2xl border border-gray-200 dark:border-gray-800 bg-[var(--bg-panel)] shadow-sm overflow-hidden hover:scale-[1.02] transition-transform">
-                                        {/* Thumbnail Area */}
-                                        <div className="h-32 w-full flex items-center justify-center relative" style={{ backgroundColor: mainColor }}>
-                                            <div className="absolute inset-0 bg-black/10 mix-blend-overlay"></div>
-                                            <PlaySquare className="h-10 w-10 text-white opacity-90 drop-shadow-md z-10" />
+                                    <div key={transcript.id} className="relative flex flex-col rounded-2xl border border-gray-200 dark:border-gray-800 bg-[var(--bg-panel)] shadow-sm hover:shadow-lg transition-shadow">
+                                        {/* Folder cover */}
+                                        <div className="w-full flex items-end justify-center pt-6 pb-3 px-5 bg-black/[0.02] dark:bg-white/[0.02] border-b border-gray-100 dark:border-gray-800 rounded-t-2xl">
+                                            <Folder
+                                                color={mainColor}
+                                                monogram={(transcript.videos?.file_name || 'V').trim().charAt(0).toUpperCase()}
+                                                size="sm"
+                                            />
                                         </div>
 
                                         <div className="p-5 flex flex-col flex-1">
                                             <div className="flex items-start justify-between mb-3">
                                                 <div className="flex flex-col">
-                                                    <h2 className="text-lg font-bold font-heading text-gray-900 dark:text-white truncate max-w-[200px] mb-2" title={transcript.videos?.file_name}>
+                                                    <h2 className="text-base font-bold font-heading text-gray-900 dark:text-white truncate max-w-[200px] mb-2" title={transcript.videos?.file_name}>
                                                         {transcript.videos?.file_name || 'Untitled Video'}
                                                     </h2>
 
@@ -189,8 +188,8 @@ export default function VideoLibraryPage() {
                                                             {transcript.attachedPillars.map(p => (
                                                                 <span
                                                                     key={p.id}
-                                                                    className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-gray-900"
-                                                                    style={{ backgroundColor: p.color }}
+                                                                    className="inline-flex items-center rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider"
+                                                                    style={{ backgroundColor: p.color, color: getPairedTextColor(p.color) }}
                                                                 >
                                                                     {p.name}
                                                                 </span>
@@ -198,7 +197,7 @@ export default function VideoLibraryPage() {
                                                         </div>
                                                     ) : (
                                                         <div className="flex mb-2">
-                                                            <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-gray-600 bg-gray-200">
+                                                            <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-gray-600 bg-gray-200">
                                                                 Uncategorized
                                                             </span>
                                                         </div>
@@ -208,23 +207,38 @@ export default function VideoLibraryPage() {
                                                 {/* Action */}
                                                 <div className="flex items-center gap-2 relative z-20">
                                                     {transcript.isDeleting ? (
-                                                        <div className="absolute right-0 top-0 bg-[var(--bg-panel)] shadow-xl border border-gray-100 dark:border-gray-800 rounded-xl p-3 flex flex-col gap-2 min-w-[180px]">
+                                                        <div className="absolute right-0 top-0 bg-[var(--bg-panel)] shadow-xl border border-gray-100 dark:border-gray-800 rounded-xl p-3 flex flex-col gap-2 min-w-[220px]">
                                                             <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest text-center">Delete Options</span>
-                                                            <button
-                                                                onClick={() => confirmDelete(transcript.id, 'hard')}
-                                                                className="text-xs font-bold font-heading border rounded-lg px-2 py-2 bg-red-50 dark:bg-red-500/10 border-red-200 dark:border-red-500/20 text-red-600 dark:text-red-400 hover:bg-red-100 transition-colors"
-                                                            >
-                                                                Wipe completely
-                                                            </button>
                                                             <button
                                                                 onClick={() => confirmDelete(transcript.id, 'soft')}
                                                                 className="text-xs font-bold font-heading border rounded-lg px-2 py-2 bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 transition-colors"
                                                             >
-                                                                Hide (Keep memory)
+                                                                Hide from library
+                                                                <span className="block text-[10px] font-normal text-gray-400 mt-0.5 normal-case tracking-normal">Transcript stays for voice profile</span>
                                                             </button>
+                                                            <div className="border-t border-gray-100 dark:border-gray-800 pt-2">
+                                                                <p className="text-[10px] text-[var(--combo-6-bg)] font-medium mb-1.5 px-1">
+                                                                    Permanent delete removes the video, transcript, and ideas. This cannot be undone.
+                                                                </p>
+                                                                <button
+                                                                    onClick={() => {
+                                                                        if (transcript.hardDeleteArmed) {
+                                                                            confirmDelete(transcript.id, 'hard')
+                                                                        } else {
+                                                                            setTranscripts(prev => prev.map(t => t.id === transcript.id ? { ...t, hardDeleteArmed: true } : t))
+                                                                        }
+                                                                    }}
+                                                                    className={`w-full text-xs font-bold font-heading border rounded-lg px-2 py-2 transition-colors ${transcript.hardDeleteArmed
+                                                                        ? 'bg-[var(--combo-6-bg)] border-[var(--combo-6-bg)] text-white hover:opacity-90'
+                                                                        : 'bg-[var(--combo-6-bg)]/10 border-[var(--combo-6-bg)]/30 text-[var(--combo-6-bg)] hover:bg-[var(--combo-6-bg)]/20'
+                                                                    }`}
+                                                                >
+                                                                    {transcript.hardDeleteArmed ? 'Click again to permanently delete' : 'Delete permanently'}
+                                                                </button>
+                                                            </div>
                                                             <button
-                                                                onClick={() => setTranscripts(prev => prev.map(t => t.id === transcript.id ? { ...t, isDeleting: false } : t))}
-                                                                className="text-xs font-medium text-gray-400 hover:text-gray-900 dark:hover:text-white"
+                                                                onClick={() => setTranscripts(prev => prev.map(t => t.id === transcript.id ? { ...t, isDeleting: false, hardDeleteArmed: false } : t))}
+                                                                className="text-xs font-medium text-gray-400 hover:text-gray-900 dark:hover:text-white pt-1"
                                                             >
                                                                 Cancel
                                                             </button>
@@ -232,7 +246,8 @@ export default function VideoLibraryPage() {
                                                     ) : (
                                                         <button
                                                             onClick={() => setTranscripts(prev => prev.map(t => t.id === transcript.id ? { ...t, isDeleting: true } : t))}
-                                                            className="rounded-full p-2 text-gray-400 transition-colors hover:bg-red-50 hover:text-red-500"
+                                                            aria-label={`Delete ${transcript.videos?.file_name || 'video'}`}
+                                                            className="rounded-full p-2 text-[var(--text-primary)]/40 transition-colors hover:bg-[var(--combo-6-bg)]/10 hover:text-[var(--combo-6-bg)]"
                                                         >
                                                             <Trash2 className="h-4 w-4" />
                                                         </button>
@@ -248,9 +263,12 @@ export default function VideoLibraryPage() {
                                                 </p>
                                             </div>
 
-                                            <div className="mt-4 flex items-center justify-between text-[11px] text-gray-400 font-bold uppercase tracking-wider font-heading border-t border-gray-100 dark:border-gray-800 pt-3">
+                                            <div className="mt-4 flex items-center justify-between text-[10px] text-[var(--text-primary)]/60 font-bold uppercase tracking-wider font-heading border-t border-gray-100 dark:border-gray-800 pt-3">
                                                 <span className="flex items-center gap-1"><Calendar className="h-3 w-3" /> {new Date(transcript.created_at).toLocaleDateString()}</span>
-                                                <span style={{ color: mainColor }}>Analyzed</span>
+                                                <span className="flex items-center gap-1.5">
+                                                    <span className="h-2 w-2 rounded-full" style={{ backgroundColor: mainColor }} aria-hidden="true" />
+                                                    Analyzed
+                                                </span>
                                             </div>
                                         </div>
                                     </div>
@@ -259,15 +277,6 @@ export default function VideoLibraryPage() {
                         </div>
                     </div>
                 </main>
-            </div>
-
-            {/* Toasts overlay */}
-            <div className="fixed bottom-6 right-6 flex flex-col gap-2 z-50 pointer-events-none">
-                {toasts.map(toast => (
-                    <div key={toast.id} className="bg-gray-900 text-white px-4 py-3 rounded-lg shadow-xl text-sm font-medium animate-in slide-in-from-bottom-5 fade-in pointer-events-auto flex items-center">
-                        {toast.message}
-                    </div>
-                ))}
             </div>
         </AppLayout>
     )

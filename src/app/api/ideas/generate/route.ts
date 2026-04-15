@@ -321,7 +321,7 @@ export async function POST(request: Request) {
             requestedCount: overGenerateCount,
         });
 
-        let candidates = await callGroq(groq, SYSTEM_MESSAGE, firstPassUser);
+        const candidates = await callGroq(groq, SYSTEM_MESSAGE, firstPassUser);
         let { kept, rejected } = filterCandidates(candidates);
 
         console.log(

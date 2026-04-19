@@ -70,18 +70,41 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
         const abortController = new AbortController()
         updateTask(task.id, { status: 'uploading', progress: 0, errorMessage: undefined, abortController })
 
+        let uploadedStoragePath: string | null = null
+
         try {
             const { data: sessionData } = await supabase.auth.getSession()
-            const token = sessionData.session?.access_token
-            if (!token) throw new Error('Session expired. Please sign out and sign back in.')
+            const userId = sessionData.session?.user?.id
+            if (!userId) throw new Error('Session expired. Please sign out and sign back in.')
 
-            const formData = new FormData()
-            formData.append('file', task.file)
+            // Upload the video directly to Supabase Storage. This bypasses
+            // Vercel's 4.5MB serverless body limit — the API route only
+            // receives a JSON pointer to the object, never the bytes.
+            const lastDot = task.file.name.lastIndexOf('.')
+            const ext = (lastDot >= 0 ? task.file.name.slice(lastDot) : '.mp4').toLowerCase()
+            const storagePath = `${userId}/${uuidv4()}${ext}`
+
+            const { error: uploadError } = await supabase.storage
+                .from('video-uploads')
+                .upload(storagePath, task.file, {
+                    contentType: task.file.type || 'video/mp4',
+                    upsert: false,
+                })
+            if (uploadError) throw new Error(`Upload failed: ${uploadError.message}`)
+            uploadedStoragePath = storagePath
+
+            if (abortController.signal.aborted) {
+                throw new DOMException('Upload cancelled', 'AbortError')
+            }
 
             const response = await fetch('/api/videos/process', {
                 method: 'POST',
-                headers: { 'Authorization': `Bearer ${token}` },
-                body: formData,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    storagePath,
+                    fileName: task.file.name,
+                    fileSize: task.file.size,
+                }),
                 signal: abortController.signal,
             })
 
@@ -126,6 +149,11 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
             updateTask(task.id, { status: 'done', progress: 100 })
         } catch (error) {
             const err = error as Error
+            // If we uploaded but the pipeline didn't finish (cancel or error before
+            // server deletes), clean up the orphan so the bucket stays empty.
+            if (uploadedStoragePath) {
+                supabase.storage.from('video-uploads').remove([uploadedStoragePath]).catch(() => {})
+            }
             if (err.name === 'AbortError') {
                 updateTask(task.id, { status: 'cancelled', errorMessage: 'Upload cancelled' })
             } else {

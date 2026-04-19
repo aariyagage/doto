@@ -14,20 +14,17 @@ import ffmpegInstaller from '@ffmpeg-installer/ffmpeg';
 ffmpeg.setFfmpegPath(ffmpegInstaller.path);
 
 const ALLOWED_VIDEO_EXTENSIONS = new Set(['.mp4', '.mov', '.webm', '.m4v', '.mkv', '.avi']);
-const ALLOWED_VIDEO_MIME_PREFIXES = ['video/'];
 const MAX_FILE_SIZE_BYTES = 500 * 1024 * 1024; // 500MB — keep in sync with client.
+const STORAGE_BUCKET = 'video-uploads';
 
 function safeVideoExtension(fileName: string): string {
     const ext = extname(fileName).toLowerCase();
     return ALLOWED_VIDEO_EXTENSIONS.has(ext) ? ext : '.mp4';
 }
 
-function isAcceptedVideoFile(file: File): boolean {
-    const ext = extname(file.name).toLowerCase();
-    if (!ALLOWED_VIDEO_EXTENSIONS.has(ext)) return false;
-    // file.type is client-controlled, so treat it as a hint, not the source of truth.
-    // We still reject blatantly non-video MIME types.
-    return !file.type || ALLOWED_VIDEO_MIME_PREFIXES.some((p) => file.type.startsWith(p));
+function isAcceptedVideoName(fileName: string): boolean {
+    const ext = extname(fileName).toLowerCase();
+    return ALLOWED_VIDEO_EXTENSIONS.has(ext);
 }
 
 // Route-level limits. maxDuration handles long-running pipeline on Vercel;
@@ -42,22 +39,30 @@ export async function POST(request: Request) {
 
     try {
         console.log("=== NEW API UPLOAD REQUEST ===");
-        const formData = await request.formData();
-        const file = formData.get('file') as File | null;
 
-        if (!file) {
-            console.error("No file found in formData");
-            return NextResponse.json({ error: 'No file received' }, { status: 400 });
+        let body: { storagePath?: unknown; fileName?: unknown; fileSize?: unknown };
+        try {
+            body = await request.json();
+        } catch {
+            return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
         }
 
-        if (file.size > MAX_FILE_SIZE_BYTES) {
+        const storagePath = typeof body.storagePath === 'string' ? body.storagePath : '';
+        const fileName = typeof body.fileName === 'string' ? body.fileName : '';
+        const fileSize = typeof body.fileSize === 'number' ? body.fileSize : 0;
+
+        if (!storagePath || !fileName) {
+            return NextResponse.json({ error: 'Missing storagePath or fileName' }, { status: 400 });
+        }
+
+        if (fileSize > MAX_FILE_SIZE_BYTES) {
             return NextResponse.json(
                 { error: `File exceeds the maximum size of ${MAX_FILE_SIZE_BYTES / (1024 * 1024)}MB` },
                 { status: 413 }
             );
         }
 
-        if (!isAcceptedVideoFile(file)) {
+        if (!isAcceptedVideoName(fileName)) {
             return NextResponse.json(
                 { error: 'Unsupported file type. Allowed extensions: .mp4 .mov .webm .m4v .mkv .avi' },
                 { status: 415 }
@@ -71,6 +76,12 @@ export async function POST(request: Request) {
         if (authError || !user) {
             console.error("Supabase Auth Error:", authError?.message || "No user found");
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+
+        // Storage paths are `{user_id}/{uuid}.ext` — reject anything outside
+        // the caller's own folder so one user can't process another's upload.
+        if (!storagePath.startsWith(`${user.id}/`) || storagePath.includes('..')) {
+            return NextResponse.json({ error: 'Forbidden storage path' }, { status: 403 });
         }
 
         const rl = rateLimit({ key: `video-process:${user.id}`, ...RATE_LIMITS.videoProcess });
@@ -92,15 +103,22 @@ export async function POST(request: Request) {
                 const tempFilesToCleanup: string[] = [];
 
                 try {
-                    // 1. Uploading
+                    // 1. Uploading (download from Storage into /tmp — the browser
+                    // already uploaded the video to the bucket, we just fetch it
+                    // server-side so the rest of the pipeline is unchanged).
                     sendEvent({ step: 'uploading' });
-                    const bytes = await file.arrayBuffer();
-                    const buffer = Buffer.from(bytes);
+                    const { data: blob, error: dlError } = await supabase.storage
+                        .from(STORAGE_BUCKET)
+                        .download(storagePath);
+                    if (dlError || !blob) {
+                        throw new Error(`Failed to download uploaded video: ${dlError?.message || 'unknown error'}`);
+                    }
+                    const buffer = Buffer.from(await blob.arrayBuffer());
 
                     const tempDir = os.tmpdir();
                     const videoId = uuidv4();
 
-                    const safeExtension = safeVideoExtension(file.name);
+                    const safeExtension = safeVideoExtension(fileName);
                     const videoPath = join(tempDir, `${videoId}-video${safeExtension}`);
                     tempFilesToCleanup.push(videoPath);
                     await writeFile(videoPath, buffer);
@@ -110,7 +128,7 @@ export async function POST(request: Request) {
                     const { error: insertError } = await supabase.from('videos').insert({
                         id: videoId,
                         user_id: user.id,
-                        file_name: file.name,
+                        file_name: fileName,
                         status: 'uploading'
                     });
                     if (insertError) throw new Error(`DB Insert Error: ${insertError.message}`);
@@ -562,7 +580,21 @@ Return ONLY a JSON object with this exact shape:
                     sendEvent({ error: errorMessage });
                     controller.close();
                 } finally {
-                    // 6. Complete Cleanup Strategy
+                    // Delete the source video from Storage — transcripts are the
+                    // durable artifact, raw video is never retained.
+                    try {
+                        const { error: removeError } = await supabase.storage
+                            .from(STORAGE_BUCKET)
+                            .remove([storagePath]);
+                        if (removeError) {
+                            console.error(`Failed to remove storage object ${storagePath}:`, removeError.message);
+                        } else {
+                            console.log(`Removed storage object ${storagePath}`);
+                        }
+                    } catch (storageCleanupError) {
+                        console.error(`Storage cleanup threw for ${storagePath}:`, storageCleanupError);
+                    }
+
                     console.log(`Cleaning up ${tempFilesToCleanup.length} temporary files...`);
                     for (const tempFile of tempFilesToCleanup) {
                         try {

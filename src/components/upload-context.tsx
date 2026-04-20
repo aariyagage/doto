@@ -2,9 +2,9 @@
 
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react'
 import { v4 as uuidv4 } from 'uuid'
-import * as tus from 'tus-js-client'
 import { createClient } from '@/lib/supabase/client'
 import { useToast } from '@/components/toast'
+import { extractAudioFromVideo } from '@/lib/audio-extractor'
 
 const MAX_FILE_SIZE_BYTES = 500 * 1024 * 1024 // 500MB
 
@@ -76,59 +76,41 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
         try {
             const { data: sessionData } = await supabase.auth.getSession()
             const userId = sessionData.session?.user?.id
-            const accessToken = sessionData.session?.access_token
-            if (!userId || !accessToken) throw new Error('Session expired. Please sign out and sign back in.')
+            if (!userId) throw new Error('Session expired. Please sign out and sign back in.')
 
-            // Upload the video directly to Supabase Storage via the TUS
-            // resumable protocol. Single-request uploads on Supabase free tier
-            // are capped at ~50MB; TUS chunks the file so each HTTP request
-            // stays under the cap while the final object can be up to the
-            // bucket's file_size_limit (500MB).
-            const lastDot = task.file.name.lastIndexOf('.')
-            const ext = (lastDot >= 0 ? task.file.name.slice(lastDot) : '.mp4').toLowerCase()
-            const storagePath = `${userId}/${uuidv4()}${ext}`
-            const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+            // Step 1: extract audio from the video in the browser. The raw
+            // video never leaves the user's machine — we only upload the
+            // resulting mp3, which is small enough to slip under every
+            // upstream upload-size cap.
+            updateTask(task.id, { status: 'extract_audio', progress: 0 })
+            const { blob: audioBlob } = await extractAudioFromVideo(
+                task.file,
+                (pct) => updateTask(task.id, { progress: pct }),
+                abortController.signal,
+            )
 
-            await new Promise<void>((resolve, reject) => {
-                const upload = new tus.Upload(task.file, {
-                    endpoint: `${supabaseUrl}/storage/v1/upload/resumable`,
-                    retryDelays: [0, 3000, 5000, 10000, 20000],
-                    headers: {
-                        authorization: `Bearer ${accessToken}`,
-                        'x-upsert': 'false',
-                    },
-                    uploadDataDuringCreation: true,
-                    removeFingerprintOnSuccess: true,
-                    metadata: {
-                        bucketName: 'video-uploads',
-                        objectName: storagePath,
-                        contentType: task.file.type || 'video/mp4',
-                        cacheControl: '3600',
-                    },
-                    chunkSize: 6 * 1024 * 1024, // Supabase TUS requires chunks > 5MB.
-                    onError: (error) => reject(error),
-                    onProgress: (bytesUploaded, bytesTotal) => {
-                        updateTask(task.id, {
-                            progress: Math.round((bytesUploaded / bytesTotal) * 100),
-                        })
-                    },
-                    onSuccess: () => resolve(),
+            if (abortController.signal.aborted) {
+                throw new DOMException('Upload cancelled', 'AbortError')
+            }
+
+            // Step 2: upload the extracted audio to Supabase Storage. The
+            // bucket is still named `video-uploads` (the existing RLS was
+            // scoped to this name) but the contents are audio-only now.
+            updateTask(task.id, { status: 'uploading', progress: 0 })
+            const storagePath = `${userId}/${uuidv4()}.mp3`
+
+            const { error: uploadError } = await supabase.storage
+                .from('video-uploads')
+                .upload(storagePath, audioBlob, {
+                    contentType: 'audio/mpeg',
+                    upsert: false,
                 })
-
-                const onAbort = () => {
-                    upload.abort()
-                    reject(new DOMException('Upload cancelled', 'AbortError'))
-                }
-                if (abortController.signal.aborted) {
-                    onAbort()
-                    return
-                }
-                abortController.signal.addEventListener('abort', onAbort, { once: true })
-
-                upload.start()
-            })
-
+            if (uploadError) throw new Error(`Upload failed: ${uploadError.message}`)
             uploadedStoragePath = storagePath
+
+            if (abortController.signal.aborted) {
+                throw new DOMException('Upload cancelled', 'AbortError')
+            }
 
             const response = await fetch('/api/videos/process', {
                 method: 'POST',

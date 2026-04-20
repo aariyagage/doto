@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import AppLayout, { getPairedTextColor } from '@/components/AppLayout'
 import { useUpload, type UploadStatus } from '@/components/upload-context'
 
-const activeSteps: UploadStatus[] = ['uploading', 'extract_audio', 'chunk_audio', 'transcribe', 'save_transcript', 'analyze']
+const activeSteps: UploadStatus[] = ['extract_audio', 'uploading', 'chunk_audio', 'transcribe', 'save_transcript', 'analyze']
 
 export default function UploadPage() {
     const router = useRouter()
@@ -105,8 +105,8 @@ export default function UploadPage() {
 
                                         <div className="flex justify-between relative px-2 mb-2">
                                             <div className="absolute top-3 left-0 w-full h-0.5 bg-[var(--border-manila-soft)] -z-10" />
-                                            {['Upload', 'Audio', 'Chunk', 'Transcribe', 'Save DB', 'Analyze', 'Done'].map((step, idx) => {
-                                                const stepKeys: UploadStatus[] = ['uploading', 'extract_audio', 'chunk_audio', 'transcribe', 'save_transcript', 'analyze', 'done']
+                                            {['Audio', 'Upload', 'Chunk', 'Transcribe', 'Save DB', 'Analyze', 'Done'].map((step, idx) => {
+                                                const stepKeys: UploadStatus[] = ['extract_audio', 'uploading', 'chunk_audio', 'transcribe', 'save_transcript', 'analyze', 'done']
                                                 const currentStepIdx = stepKeys.indexOf(task.status)
 
                                                 let adjustedCurrentIdx = currentStepIdx

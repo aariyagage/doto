@@ -14,13 +14,8 @@ import ffmpegInstaller from '@ffmpeg-installer/ffmpeg';
 ffmpeg.setFfmpegPath(ffmpegInstaller.path);
 
 const ALLOWED_VIDEO_EXTENSIONS = new Set(['.mp4', '.mov', '.webm', '.m4v', '.mkv', '.avi']);
-const MAX_FILE_SIZE_BYTES = 500 * 1024 * 1024; // 500MB — keep in sync with client.
+const MAX_FILE_SIZE_BYTES = 500 * 1024 * 1024; // 500MB — matches the client-side cap on the source video.
 const STORAGE_BUCKET = 'video-uploads';
-
-function safeVideoExtension(fileName: string): string {
-    const ext = extname(fileName).toLowerCase();
-    return ALLOWED_VIDEO_EXTENSIONS.has(ext) ? ext : '.mp4';
-}
 
 function isAcceptedVideoName(fileName: string): boolean {
     const ext = extname(fileName).toLowerCase();
@@ -103,26 +98,25 @@ export async function POST(request: Request) {
                 const tempFilesToCleanup: string[] = [];
 
                 try {
-                    // 1. Uploading (download from Storage into /tmp — the browser
-                    // already uploaded the video to the bucket, we just fetch it
-                    // server-side so the rest of the pipeline is unchanged).
+                    // 1. Uploading (download the already-extracted audio from
+                    // Storage into /tmp — the browser ran ffmpeg.wasm locally,
+                    // so we skip server-side extraction entirely).
                     sendEvent({ step: 'uploading' });
                     const { data: blob, error: dlError } = await supabase.storage
                         .from(STORAGE_BUCKET)
                         .download(storagePath);
                     if (dlError || !blob) {
-                        throw new Error(`Failed to download uploaded video: ${dlError?.message || 'unknown error'}`);
+                        throw new Error(`Failed to download uploaded audio: ${dlError?.message || 'unknown error'}`);
                     }
                     const buffer = Buffer.from(await blob.arrayBuffer());
 
                     const tempDir = os.tmpdir();
                     const videoId = uuidv4();
 
-                    const safeExtension = safeVideoExtension(fileName);
-                    const videoPath = join(tempDir, `${videoId}-video${safeExtension}`);
-                    tempFilesToCleanup.push(videoPath);
-                    await writeFile(videoPath, buffer);
-                    console.log(`Saved temp video to ${videoPath}`);
+                    const audioPath = join(tempDir, `${videoId}-audio.mp3`);
+                    tempFilesToCleanup.push(audioPath);
+                    await writeFile(audioPath, buffer);
+                    console.log(`Saved temp audio to ${audioPath}`);
 
                     // Create basic video record with strict error checking
                     const { error: insertError } = await supabase.from('videos').insert({
@@ -132,26 +126,6 @@ export async function POST(request: Request) {
                         status: 'uploading'
                     });
                     if (insertError) throw new Error(`DB Insert Error: ${insertError.message}`);
-
-                    // 2. Extract Audio
-                    sendEvent({ step: 'extract_audio' });
-                    const { error: updateError1 } = await supabase.from('videos').update({ status: 'extract_audio' }).eq('id', videoId);
-                    if (updateError1) throw new Error(`DB Update Error: ${updateError1.message}`);
-
-                    const audioPath = join(tempDir, `${videoId}-audio.mp3`);
-                    tempFilesToCleanup.push(audioPath);
-
-                    await new Promise((resolve, reject) => {
-                        ffmpeg(videoPath)
-                            .noVideo()
-                            .audioCodec('libmp3lame')
-                            .audioChannels(1)
-                            .audioFrequency(16000)
-                            .on('end', resolve)
-                            .on('error', reject)
-                            .save(audioPath);
-                    });
-                    console.log(`Successfully extracted audio to ${audioPath}`);
 
                     // 3. Audio Chunking (if > 24MB to stay safely under Groq 25MB limits)
                     const audioStats = await stat(audioPath);

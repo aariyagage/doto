@@ -2,6 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react'
 import { v4 as uuidv4 } from 'uuid'
+import * as tus from 'tus-js-client'
 import { createClient } from '@/lib/supabase/client'
 import { useToast } from '@/components/toast'
 
@@ -75,27 +76,59 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
         try {
             const { data: sessionData } = await supabase.auth.getSession()
             const userId = sessionData.session?.user?.id
-            if (!userId) throw new Error('Session expired. Please sign out and sign back in.')
+            const accessToken = sessionData.session?.access_token
+            if (!userId || !accessToken) throw new Error('Session expired. Please sign out and sign back in.')
 
-            // Upload the video directly to Supabase Storage. This bypasses
-            // Vercel's 4.5MB serverless body limit — the API route only
-            // receives a JSON pointer to the object, never the bytes.
+            // Upload the video directly to Supabase Storage via the TUS
+            // resumable protocol. Single-request uploads on Supabase free tier
+            // are capped at ~50MB; TUS chunks the file so each HTTP request
+            // stays under the cap while the final object can be up to the
+            // bucket's file_size_limit (500MB).
             const lastDot = task.file.name.lastIndexOf('.')
             const ext = (lastDot >= 0 ? task.file.name.slice(lastDot) : '.mp4').toLowerCase()
             const storagePath = `${userId}/${uuidv4()}${ext}`
+            const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 
-            const { error: uploadError } = await supabase.storage
-                .from('video-uploads')
-                .upload(storagePath, task.file, {
-                    contentType: task.file.type || 'video/mp4',
-                    upsert: false,
+            await new Promise<void>((resolve, reject) => {
+                const upload = new tus.Upload(task.file, {
+                    endpoint: `${supabaseUrl}/storage/v1/upload/resumable`,
+                    retryDelays: [0, 3000, 5000, 10000, 20000],
+                    headers: {
+                        authorization: `Bearer ${accessToken}`,
+                        'x-upsert': 'false',
+                    },
+                    uploadDataDuringCreation: true,
+                    removeFingerprintOnSuccess: true,
+                    metadata: {
+                        bucketName: 'video-uploads',
+                        objectName: storagePath,
+                        contentType: task.file.type || 'video/mp4',
+                        cacheControl: '3600',
+                    },
+                    chunkSize: 6 * 1024 * 1024, // Supabase TUS requires chunks > 5MB.
+                    onError: (error) => reject(error),
+                    onProgress: (bytesUploaded, bytesTotal) => {
+                        updateTask(task.id, {
+                            progress: Math.round((bytesUploaded / bytesTotal) * 100),
+                        })
+                    },
+                    onSuccess: () => resolve(),
                 })
-            if (uploadError) throw new Error(`Upload failed: ${uploadError.message}`)
-            uploadedStoragePath = storagePath
 
-            if (abortController.signal.aborted) {
-                throw new DOMException('Upload cancelled', 'AbortError')
-            }
+                const onAbort = () => {
+                    upload.abort()
+                    reject(new DOMException('Upload cancelled', 'AbortError'))
+                }
+                if (abortController.signal.aborted) {
+                    onAbort()
+                    return
+                }
+                abortController.signal.addEventListener('abort', onAbort, { once: true })
+
+                upload.start()
+            })
+
+            uploadedStoragePath = storagePath
 
             const response = await fetch('/api/videos/process', {
                 method: 'POST',

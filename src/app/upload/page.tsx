@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import AppLayout, { getPairedTextColor } from '@/components/AppLayout'
 import { useUpload, type UploadStatus } from '@/components/upload-context'
 
-const activeSteps: UploadStatus[] = ['extract_audio', 'uploading', 'chunk_audio', 'transcribe', 'save_transcript', 'analyze']
+const activeSteps: UploadStatus[] = ['extract_audio', 'uploading', 'chunk_audio', 'transcribe', 'save_transcript', 'analyze', 'pillars_ready']
 
 export default function UploadPage() {
     const router = useRouter()
@@ -76,8 +76,8 @@ export default function UploadPage() {
 
                         {completedCount > 0 && (
                             <div className="text-center font-caslon italic text-lg text-[var(--text-primary)]/70 mt-2">
-                                {completedCount === 1 && "1 video analyzed \u00b7 add 2\u20133 more for best results"}
-                                {completedCount === 2 && "2 videos analyzed \u00b7 getting better"}
+                                {completedCount === 1 && "1 video analyzed \u00b7 add 1 more to discover your pillars"}
+                                {completedCount === 2 && "2 videos analyzed \u00b7 your first pillars are being discovered"}
                                 {(completedCount >= 3 && completedCount <= 4) && `${completedCount} videos analyzed \u00b7 good coverage`}
                                 {completedCount >= 5 && `${completedCount} videos analyzed \u00b7 great coverage`}
                             </div>
@@ -105,8 +105,8 @@ export default function UploadPage() {
 
                                         <div className="flex justify-between relative px-2 mb-2">
                                             <div className="absolute top-3 left-0 w-full h-0.5 bg-[var(--border-manila-soft)] -z-10" />
-                                            {['Audio', 'Upload', 'Chunk', 'Transcribe', 'Save DB', 'Analyze', 'Done'].map((step, idx) => {
-                                                const stepKeys: UploadStatus[] = ['extract_audio', 'uploading', 'chunk_audio', 'transcribe', 'save_transcript', 'analyze', 'done']
+                                            {['Audio', 'Upload', 'Chunk', 'Transcribe', 'Save DB', 'Analyze', 'Pillars', 'Done'].map((step, idx) => {
+                                                const stepKeys: UploadStatus[] = ['extract_audio', 'uploading', 'chunk_audio', 'transcribe', 'save_transcript', 'analyze', 'pillars_ready', 'done']
                                                 const currentStepIdx = stepKeys.indexOf(task.status)
 
                                                 let adjustedCurrentIdx = currentStepIdx

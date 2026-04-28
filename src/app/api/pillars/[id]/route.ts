@@ -40,15 +40,24 @@ export async function PATCH(request: Request, { params }: { params: { id: string
 
         const { id } = await params;
         const body = await request.json();
-        const { name } = body;
+        const { name, is_series } = body as { name?: unknown; is_series?: unknown };
 
-        if (!name) {
-            return NextResponse.json({ error: 'Name is required' }, { status: 400 });
+        const updates: Record<string, unknown> = {};
+        if (typeof name === 'string') {
+            const trimmed = name.trim();
+            if (!trimmed) return NextResponse.json({ error: 'Name cannot be empty' }, { status: 400 });
+            updates.name = trimmed;
+        }
+        if (typeof is_series === 'boolean') {
+            updates.is_series = is_series;
+        }
+        if (Object.keys(updates).length === 0) {
+            return NextResponse.json({ error: 'No updatable fields provided' }, { status: 400 });
         }
 
         const { error } = await supabase
             .from('pillars')
-            .update({ name })
+            .update(updates)
             .match({ id: id, user_id: user.id });
 
         if (error) {

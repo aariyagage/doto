@@ -16,6 +16,7 @@ export type UploadStatus =
     | 'transcribe'
     | 'save_transcript'
     | 'analyze'
+    | 'pillars_ready'
     | 'done'
     | 'error'
     | 'cancelled'

@@ -323,7 +323,9 @@ export async function POST(request: Request) {
             );
         }
 
-        // 2. Optional body params
+        // 2. Optional body params. `count` is now PER-PILLAR. Empty pillar_ids
+        //    means "All Ideas" filter — we generate `count` ideas for EVERY pillar
+        //    the user has. With 4 pillars and count=3, that's 12 ideas.
         let body: { pillar_ids?: unknown; count?: unknown } = {};
         try {
             body = await request.json();
@@ -331,7 +333,7 @@ export async function POST(request: Request) {
             // body is optional
         }
         const pillar_ids: string[] = Array.isArray(body.pillar_ids) ? (body.pillar_ids as string[]) : [];
-        const requestedCount = Math.min(Number(body.count) || 5, 10);
+        const perPillarCount = Math.max(1, Math.min(Number(body.count) || 3, 5));
 
         // 3. Voice profile
         const { data: voiceProfile, error: vpError } = await supabase
@@ -344,91 +346,122 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'No voice profile found. Upload videos first.' }, { status: 400 });
         }
 
-        // 4. Pillars
+        // 4. Determine target pillars.
         let pillarsQuery = supabase.from('pillars').select('id, name').eq('user_id', user.id);
         if (pillar_ids.length > 0) pillarsQuery = pillarsQuery.in('id', pillar_ids);
         const { data: pillars, error: pillarsError } = await pillarsQuery;
         if (pillarsError) throw new Error(`Failed to fetch pillars: ${pillarsError.message}`);
-        const pillarNames = pillars?.map((p) => p.name) || [];
+        const targetPillars = pillars || [];
+        if (targetPillars.length === 0) {
+            return NextResponse.json(
+                { error: 'No pillars to generate for. Upload videos first or pick a different filter.' },
+                { status: 400 }
+            );
+        }
 
-        // 5. Transcripts
-        let transcriptsData: { raw_text: string; word_count: number }[] = [];
-        if (pillar_ids.length > 0) {
-            const { data: vpData, error: vpErr } = await supabase
+        // 5. For each target pillar: fetch its transcripts in parallel and call
+        //    Groq with single-pillar context. This keeps each call's prompt
+        //    focused — the LLM only sees one pillar's transcripts and is asked
+        //    for ideas in that pillar — instead of being asked to balance across
+        //    a flat list (which it doesn't reliably do).
+        const groq = new Groq({ apiKey: requireEnv('GROQ_API_KEY') });
+        const overGeneratePerPillar = perPillarCount + 2;
+
+        async function generateForPillar(pillar: { id: string; name: string }): Promise<{
+            pillarId: string;
+            pillarName: string;
+            kept: CandidateIdea[];
+            rejected: { idea: CandidateIdea; reason: string }[];
+            transcriptsForFilter: string;
+        }> {
+            // Pillar-scoped transcripts. Fall back to user's full library only
+            // if the pillar has zero tagged videos (fresh pillar with no tags
+            // shouldn't return zero ideas just because of a tagging gap).
+            const { data: vpData } = await supabase
                 .from('video_pillars')
                 .select('video_id')
-                .in('pillar_id', pillar_ids);
-            if (vpErr) throw new Error(`Failed to fetch video_pillars: ${vpErr.message}`);
-            const videoIds = vpData?.map((vp) => vp.video_id) || [];
+                .eq('pillar_id', pillar.id);
+            const videoIds = (vpData || []).map(vp => vp.video_id as string);
+
+            let transcriptsData: { raw_text: string; word_count: number }[] = [];
             if (videoIds.length > 0) {
-                const { data: tData, error: tErr } = await supabase
+                const { data: tData } = await supabase
                     .from('transcripts')
                     .select('raw_text, word_count')
-                    .eq('user_id', user.id)
+                    .eq('user_id', user!.id)
                     .in('video_id', videoIds)
                     .order('word_count', { ascending: false })
-                    .limit(10);
-                if (tErr) throw new Error(`Failed to fetch transcripts: ${tErr.message}`);
+                    .limit(5);
                 transcriptsData = tData || [];
             }
-        } else {
-            const { data: tData, error: tErr } = await supabase
-                .from('transcripts')
-                .select('raw_text, word_count')
-                .eq('user_id', user.id)
-                .order('word_count', { ascending: false })
-                .limit(10);
-            if (tErr) throw new Error(`Failed to fetch transcripts: ${tErr.message}`);
-            transcriptsData = tData || [];
-        }
+            if (transcriptsData.length === 0) {
+                const { data: tData } = await supabase
+                    .from('transcripts')
+                    .select('raw_text, word_count')
+                    .eq('user_id', user!.id)
+                    .order('word_count', { ascending: false })
+                    .limit(5);
+                transcriptsData = tData || [];
+            }
 
-        const top3 = transcriptsData.slice(0, 3);
-        let combinedTranscripts = top3.map((t) => t.raw_text).join('\n---\n');
-        if (combinedTranscripts.length > 4000) combinedTranscripts = combinedTranscripts.substring(0, 4000);
+            let combinedTranscripts = transcriptsData.slice(0, 3).map(t => t.raw_text).join('\n---\n');
+            if (combinedTranscripts.length > 4000) combinedTranscripts = combinedTranscripts.substring(0, 4000);
 
-        // 6. Two-pass generation: over-generate, filter, retry once if short.
-        const overGenerateCount = Math.min(requestedCount + 4, 12);
-        const groq = new Groq({ apiKey: requireEnv('GROQ_API_KEY') });
-
-        const firstPassUser = buildUserMessage({
-            voiceProfile: voiceProfile as VoiceProfileRow,
-            combinedTranscripts,
-            pillarNames,
-            requestedCount: overGenerateCount,
-        });
-
-        const candidates = await callGroq(groq, SYSTEM_MESSAGE, firstPassUser);
-        let { kept, rejected } = filterCandidates(candidates, combinedTranscripts);
-
-        console.log(
-            `ideas/generate pass 1 — candidates=${candidates.length} kept=${kept.length} rejected=${rejected.length}`
-        );
-
-        // If first pass yields fewer than requested, escalate once.
-        if (kept.length < requestedCount) {
-            const rejectReasons = rejected.slice(0, 3).map((r) => `"${(r.idea.title || '').slice(0, 60)}" — ${r.reason}`).join('; ');
-            const escalation = `${rejected.length} ideas were thrown out (e.g. ${rejectReasons}). Try again. Push harder on divergence. Each idea must be about a meaningfully different moment or belief, not a rewording. If you only have source material for ${kept.length} good ideas, return that many — do not pad with variations.`;
-
-            const retryUser = buildUserMessage({
+            const userMsg = buildUserMessage({
                 voiceProfile: voiceProfile as VoiceProfileRow,
                 combinedTranscripts,
-                pillarNames,
-                requestedCount: overGenerateCount,
-                escalation,
+                pillarNames: [pillar.name],
+                requestedCount: overGeneratePerPillar,
             });
-            const retryCandidates = await callGroq(groq, SYSTEM_MESSAGE, retryUser);
-            const retryFilter = filterCandidates(retryCandidates, combinedTranscripts);
+
+            let candidates: CandidateIdea[] = [];
+            try {
+                candidates = await callGroq(groq, SYSTEM_MESSAGE, userMsg);
+            } catch (err) {
+                console.error(`ideas/generate pillar="${pillar.name}" Groq failed:`, err);
+                return { pillarId: pillar.id, pillarName: pillar.name, kept: [], rejected: [], transcriptsForFilter: combinedTranscripts };
+            }
+            // Force-tag every candidate with this pillar so downstream insertion
+            // can match by name even if the LLM hallucinated a different pillar.
+            for (const c of candidates) c.pillar = pillar.name;
+
+            const { kept, rejected } = filterCandidates(candidates, combinedTranscripts);
             console.log(
-                `ideas/generate pass 2 — candidates=${retryCandidates.length} kept=${retryFilter.kept.length} rejected=${retryFilter.rejected.length}`
+                `ideas/generate pillar="${pillar.name}" candidates=${candidates.length} kept=${kept.length} rejected=${rejected.length}`
             );
-            // Merge pass 1 + pass 2 kept, then dedupe across the full merged set.
-            const merged = dedupeBySimilarity([...kept, ...retryFilter.kept]);
-            kept = merged;
-            rejected = [...rejected, ...retryFilter.rejected];
+            return { pillarId: pillar.id, pillarName: pillar.name, kept, rejected, transcriptsForFilter: combinedTranscripts };
         }
 
-        // Trim to the requested count.
-        const finalIdeas = kept.slice(0, requestedCount);
+        const pillarResults = await Promise.all(targetPillars.map(p => generateForPillar({ id: p.id, name: p.name })));
+
+        // 6. Cross-pillar dedup: an aggressive creator might produce two
+        //    near-identical ideas for two different pillars (same anchor moment,
+        //    similar hook). Dedupe across the union, but keep the per-pillar
+        //    bucketing — we trim each pillar to perPillarCount independently.
+        const allKeptWithBucket: { pillarId: string; idea: CandidateIdea }[] = [];
+        for (const r of pillarResults) {
+            for (const idea of r.kept) {
+                allKeptWithBucket.push({ pillarId: r.pillarId, idea });
+            }
+        }
+        const dedupedFlat = dedupeBySimilarity(allKeptWithBucket.map(x => x.idea));
+        const dedupedSet = new Set(dedupedFlat);
+
+        const finalByPillar = new Map<string, CandidateIdea[]>();
+        for (const { pillarId, idea } of allKeptWithBucket) {
+            if (!dedupedSet.has(idea)) continue;
+            const bucket = finalByPillar.get(pillarId) || [];
+            if (bucket.length < perPillarCount) {
+                bucket.push(idea);
+                finalByPillar.set(pillarId, bucket);
+            }
+        }
+
+        const finalIdeas: { pillarId: string; idea: CandidateIdea }[] = [];
+        for (const [pillarId, bucket] of finalByPillar.entries()) {
+            for (const idea of bucket) finalIdeas.push({ pillarId, idea });
+        }
+        const totalRejected = pillarResults.reduce((sum, r) => sum + r.rejected.length, 0);
 
         if (finalIdeas.length === 0) {
             return NextResponse.json(
@@ -437,15 +470,11 @@ export async function POST(request: Request) {
             );
         }
 
-        // 7. Insert into content_ideas
+        // 7. Insert into content_ideas, mapping each idea to its bucket pillar.
         const insertedIdeas = [];
         const insertErrors: { title: string | undefined; error: string; code?: string; details?: string | null; hint?: string | null }[] = [];
 
-        for (const idea of finalIdeas) {
-            const cleanIdeaPillar = idea.pillar?.trim().toLowerCase() || '';
-            const matchedPillar = pillars?.find((p) => p.name.trim().toLowerCase() === cleanIdeaPillar);
-            const pillar_id = matchedPillar ? matchedPillar.id : null;
-
+        for (const { pillarId, idea } of finalIdeas) {
             const reasoningParts = [
                 idea.description || idea.reasoning,
                 idea.tension_type ? `Tension: ${idea.tension_type}` : null,
@@ -464,7 +493,7 @@ export async function POST(request: Request) {
                     hook: idea.hook,
                     structure: idea.structure,
                     reasoning: reasoningParts.join('\n\n'),
-                    pillar_id,
+                    pillar_id: pillarId,
                     is_saved: false,
                     is_used: false,
                 })
@@ -486,7 +515,7 @@ export async function POST(request: Request) {
         }
 
         console.log(
-            `ideas/generate summary — requested=${requestedCount} final=${finalIdeas.length} inserted=${insertedIdeas.length} failed=${insertErrors.length} total_rejected=${rejected.length}`
+            `ideas/generate summary — pillars=${targetPillars.length} per_pillar=${perPillarCount} final=${finalIdeas.length} inserted=${insertedIdeas.length} failed=${insertErrors.length} total_rejected=${totalRejected}`
         );
 
         if (finalIdeas.length > 0 && insertedIdeas.length === 0) {

@@ -10,6 +10,19 @@ interface Pillar {
     id: string;
     name: string;
     color: string;
+    description?: string | null;
+    is_series?: boolean;
+    last_tagged_at?: string | null;
+}
+
+interface PillarState {
+    pillarCount: number;
+    isOverSoftCap: boolean;
+    softCap: number;
+    untaggedRecentVideos: number;
+    staleNudgeThreshold: number;
+    shouldShowStaleNudge: boolean;
+    eligibleTranscriptCount: number;
 }
 
 interface Idea {
@@ -44,6 +57,20 @@ export default function IdeasPage() {
     const [editingPillarName, setEditingPillarName] = useState("")
     const [isDeletingPillars, setIsDeletingPillars] = useState(false)
     const [isRegeneratingPillars, setIsRegeneratingPillars] = useState(false)
+    const [pillarState, setPillarState] = useState<PillarState | null>(null)
+
+    // Refetches the auxiliary pillar state (used by the empty-state, soft-cap,
+    // and stale-pillar banners). Cheap call; fire it after any pillar mutation.
+    const fetchPillarState = async () => {
+        try {
+            const res = await fetch('/api/pillars/state')
+            if (!res.ok) return
+            const data: PillarState = await res.json()
+            setPillarState(data)
+        } catch (e) {
+            console.error('Failed to fetch pillar state:', e)
+        }
+    }
 
     // Fetch initial data
     useEffect(() => {
@@ -57,6 +84,9 @@ export default function IdeasPage() {
                 .order('created_at', { ascending: true })
 
             if (pillarsData) setPillars(pillarsData)
+
+            // Fetch auxiliary pillar state (banners, soft cap, stale nudge).
+            await fetchPillarState()
 
             // 2. Fetch ideas from backend with Auth header
             const { data: sessionData } = await supabase.auth.getSession()
@@ -221,12 +251,13 @@ export default function IdeasPage() {
         }
     }
 
-    // Generate batch
+    // Generate batch. `count` is per-pillar — 3 ideas for each pillar in scope.
+    // Scope = selected pillars OR all pillars if "All Ideas" is on.
     const generateBatch = async () => {
         setIsGenerating(true)
         const token = await getToken()
         try {
-            const currentCount = 3 // Create 3 max for batch generate
+            const perPillarCount = 3
 
             const res = await fetch('/api/ideas/generate', {
                 method: 'POST',
@@ -234,13 +265,18 @@ export default function IdeasPage() {
                     'Authorization': `Bearer ${token}`,
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({ count: currentCount, pillar_ids: selectedPillars })
+                body: JSON.stringify({ count: perPillarCount, pillar_ids: selectedPillars })
             })
 
             const newIdeas = await res.json()
             if (res.ok && Array.isArray(newIdeas)) {
                 setIdeas(prev => [...newIdeas.map(i => ({ ...i, isExpanded: false, isDeleting: false })), ...prev])
-                showToast(`✦ ${newIdeas.length} new ideas generated`)
+                const pillarsCovered = new Set(newIdeas.map(i => i.pillar_id).filter(Boolean)).size
+                showToast(
+                    pillarsCovered > 1
+                        ? `✦ ${newIdeas.length} ideas generated across ${pillarsCovered} pillars`
+                        : `✦ ${newIdeas.length} new ideas generated`
+                )
             } else {
                 throw new Error(newIdeas.error || "Generation failed")
             }
@@ -269,6 +305,7 @@ export default function IdeasPage() {
             if (res.ok) {
                 setPillars(prev => prev.filter(p => p.id !== id))
                 setSelectedPillars(prev => prev.filter(pid => pid !== id))
+                fetchPillarState()
                 showToast("Pillar deleted")
             } else throw new Error()
         } catch {
@@ -283,11 +320,16 @@ export default function IdeasPage() {
         try {
             const res = await fetch(`/api/pillars`, {
                 method: 'DELETE',
-                headers: { 'Authorization': `Bearer ${token}` }
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ confirm: 'DELETE_ALL_PILLARS' }),
             })
             if (res.ok) {
                 setPillars([])
                 setSelectedPillars([])
+                fetchPillarState()
                 showToast("All pillars deleted")
             } else throw new Error()
         } catch {
@@ -306,8 +348,9 @@ export default function IdeasPage() {
                 headers: { 'Authorization': `Bearer ${token}` }
             })
             if (res.ok) {
-                const { data } = await supabase.from('pillars').select('*')
+                const { data } = await supabase.from('pillars').select('*').order('created_at', { ascending: true })
                 if (data) setPillars(data)
+                await fetchPillarState()
                 showToast("Pillars regenerated!")
             } else {
                 showToast("Failed to regenerate")
@@ -419,7 +462,10 @@ export default function IdeasPage() {
                                             Clear all
                                         </button>
                                     )}
-                                    {pillars.length === 0 && (
+                                    {/* Regenerate is always visible once the user has enough transcripts.
+                                        Hidden during onboarding (< 2 transcripts) so users don't try to
+                                        regenerate from nothing. */}
+                                    {(pillarState?.eligibleTranscriptCount ?? 0) >= 2 && (
                                         <button
                                             onClick={regeneratePillars}
                                             disabled={isRegeneratingPillars}
@@ -432,9 +478,46 @@ export default function IdeasPage() {
                                 </div>
                             </div>
 
+                            {/* Soft-cap nudge: pillar list is getting unwieldy. */}
+                            {pillarState?.isOverSoftCap && (
+                                <div className="mb-4 px-4 py-3 rounded-lg bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/30">
+                                    <p className="text-sm font-ui text-amber-900 dark:text-amber-100">
+                                        You have {pillarState.pillarCount} pillars. Content tends to lose focus past {pillarState.softCap} —
+                                        consider deleting the least-tagged ones below.
+                                    </p>
+                                </div>
+                            )}
+
+                            {/* Stale-pillar nudge: recent uploads aren't fitting any existing pillar. */}
+                            {pillarState?.shouldShowStaleNudge && (
+                                <div className="mb-4 px-4 py-3 rounded-lg bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/30 flex items-center justify-between gap-4">
+                                    <p className="text-sm font-ui text-blue-900 dark:text-blue-100">
+                                        {pillarState.untaggedRecentVideos} recent video{pillarState.untaggedRecentVideos === 1 ? '' : 's'}{' '}
+                                        didn&apos;t fit any pillar. Your content may have shifted.
+                                    </p>
+                                    <button
+                                        onClick={regeneratePillars}
+                                        disabled={isRegeneratingPillars}
+                                        className="text-xs font-bold font-heading text-blue-700 dark:text-blue-200 hover:underline whitespace-nowrap"
+                                    >
+                                        {isRegeneratingPillars ? 'Regenerating…' : 'Regenerate →'}
+                                    </button>
+                                </div>
+                            )}
+
                             <div className="flex flex-wrap gap-4 relative">
                                 {pillars.length === 0 ? (
-                                    <p className="text-gray-400 dark:text-gray-500 text-sm italic w-full font-ui">No active pillars. Upload a video or regenerate.</p>
+                                    (pillarState?.eligibleTranscriptCount ?? 0) < 2 ? (
+                                        <p className="text-gray-500 dark:text-gray-400 text-sm w-full font-ui">
+                                            Upload at least 2 videos to discover your pillars.
+                                            {' '}
+                                            <a href="/upload" className="font-bold text-blue-600 hover:underline">Upload now →</a>
+                                        </p>
+                                    ) : (
+                                        <p className="text-gray-400 dark:text-gray-500 text-sm italic w-full font-ui">
+                                            Pillars haven&apos;t been generated yet. Click Regenerate above.
+                                        </p>
+                                    )
                                 ) : (
                                     <div
                                         onClick={() => setSelectedPillars([])}
@@ -501,6 +584,14 @@ export default function IdeasPage() {
                                             >
                                                 {p.name}
                                             </span>
+                                            {p.is_series && (
+                                                <span
+                                                    className={`text-[8px] tracking-widest uppercase font-heading font-bold rounded-sm px-1 py-0.5 relative z-10 ${isSelected ? 'bg-black/10 text-black/70' : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300'}`}
+                                                    title="Series pillar"
+                                                >
+                                                    Series
+                                                </span>
+                                            )}
                                             <button
                                                 onClick={(e) => deletePillar(e, p.id)}
                                                 className={`rounded-md p-1 transition-all opacity-0 group-hover:opacity-100 relative z-10 ${isSelected ? 'text-black/50 hover:bg-black/10' : 'text-gray-400 hover:text-red-500 hover:bg-gray-100 dark:hover:bg-gray-800'}`}

@@ -1,36 +1,39 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Doto
 
-## Getting Started
+Doto turns a content creator's existing videos into ongoing short-form content ideas in their own voice. Upload a few reels — Doto transcribes each one, derives the creator's voice profile and content pillars, and generates new Instagram Reel / TikTok / Shorts ideas that sound like things only that creator would post.
 
-First, run the development server:
+## How it works (one paragraph)
+
+Each uploaded video is transcribed (Groq Whisper), then reduced to a ~300-character "essence" plus an embedding (HuggingFace MiniLM). The first two essences seed a set of broad content **pillars**; subsequent uploads are tag-or-created into existing pillars via a cosine-similarity-then-LLM ladder, with semantic dedup so "Mindset" and "Mindset Shifts" don't both get created. Series content (recurring branded segments like *"welcome to my Solopreneur Saturdays"*) is detected separately. Idea generation runs per-pillar, in parallel, with each call seeing only that pillar's tagged transcripts.
+
+Architecture deep-dive: see [`docs/pillar-system.md`](docs/pillar-system.md).
+
+## Stack
+
+- **Frontend & API:** Next.js 14 (App Router), Tailwind, deployed on Vercel
+- **DB & Auth:** Supabase (Postgres + pgvector + Storage + Auth)
+- **LLM:** Groq (llama-3.3-70b-versatile) — free tier
+- **Embeddings:** HuggingFace `sentence-transformers/all-MiniLM-L6-v2` — free tier
+- **Transcription:** Groq Whisper (whisper-large-v3) — free tier
+- **Audio extraction:** ffmpeg.wasm in the browser (no server-side ffmpeg required for video → audio)
+- **Resumable uploads:** TUS, to bypass Vercel's request-body and Supabase's per-request size limits
+
+## Local setup
 
 ```bash
+npm install
+cp .env.example .env.local   # fill in NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY, GROQ_API_KEY, HF_API_TOKEN
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Apply migrations in the Supabase SQL editor in numerical order:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```
+migrations/001_voice_profile_enrichment.sql
+migrations/002_pillar_overhaul.sql
+migrations/003_pillar_subtopics.sql
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Documentation
 
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- [`docs/pillar-system.md`](docs/pillar-system.md) — pillar generation, series detection, idea generation, schema, thresholds, code map, operational notes

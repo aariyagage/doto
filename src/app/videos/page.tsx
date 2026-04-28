@@ -1,18 +1,20 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { Trash2, Calendar } from 'lucide-react'
+import { Trash2, Calendar, Layers } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
 import AppLayout, { getPairedTextColor } from '@/components/AppLayout'
 import { useToast } from '@/components/toast'
 import Folder from '@/components/Folder'
+import PillarSeriesDeclareModal from '@/components/PillarSeriesDeclareModal'
 
 interface Pillar {
     id: string;
     name: string;
     color: string;
+    is_series?: boolean;
 }
 
 interface VideoPillar {
@@ -36,67 +38,68 @@ export default function VideoLibraryPage() {
     const { showToast } = useToast()
     const [transcripts, setTranscripts] = useState<Transcript[]>([])
     const [isLoading, setIsLoading] = useState(true)
+    const [seriesModalVideoId, setSeriesModalVideoId] = useState<string | null>(null)
+    const [seriesModalVideoTitle, setSeriesModalVideoTitle] = useState<string | undefined>(undefined)
 
-    // Fetch initial data
-    useEffect(() => {
-        const loadData = async () => {
-            setIsLoading(true)
-
-            const { data: { user } } = await supabase.auth.getUser()
-            if (!user) {
-                setIsLoading(false)
-                return
-            }
-
-            // Fetch pillars (owned by this user)
-            const { data: pillarsData } = await supabase
-                .from('pillars')
-                .select('*')
-                .eq('user_id', user.id)
-
-            const pillars: Pillar[] = pillarsData || [];
-
-            // Fetch this user's transcripts with the joined video filenames
-            const { data: tsData, error } = await supabase
-                .from('transcripts')
-                .select(`
-                    id,
-                    video_id,
-                    raw_text,
-                    created_at,
-                    videos ( file_name )
-                `)
-                .eq('user_id', user.id)
-                .or('is_hidden.is.null,is_hidden.eq.false')
-                .order('created_at', { ascending: false })
-
-            // video_pillars has no user_id column — scope by video_ids the user owns.
-            const userVideoIds = (tsData || []).map(t => t.video_id);
-            const { data: vpData } = userVideoIds.length > 0
-                ? await supabase.from('video_pillars').select('*').in('video_id', userVideoIds)
-                : { data: [] };
-            const videoPillars: VideoPillar[] = vpData || [];
-
-            if (!error && tsData) {
-                // Map the resolved pillars to each transcript
-                const processed = tsData.map(t => {
-                    const tvps = videoPillars.filter(vp => vp.video_id === t.video_id);
-                    const attachedPillars = tvps.map(vp => pillars.find(p => p.id === vp.pillar_id)).filter(Boolean) as Pillar[];
-                    return {
-                        ...t,
-                        videos: Array.isArray(t.videos) ? t.videos[0] : t.videos,
-                        attachedPillars,
-                        isDeleting: false
-                    }
-                }) as Transcript[];
-
-                setTranscripts(processed)
-            }
-
+    const loadData = useCallback(async () => {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) {
             setIsLoading(false)
+            return
         }
-        loadData()
+
+        // Fetch pillars (owned by this user)
+        const { data: pillarsData } = await supabase
+            .from('pillars')
+            .select('*')
+            .eq('user_id', user.id)
+
+        const pillars: Pillar[] = pillarsData || [];
+
+        // Fetch this user's transcripts with the joined video filenames
+        const { data: tsData, error } = await supabase
+            .from('transcripts')
+            .select(`
+                id,
+                video_id,
+                raw_text,
+                created_at,
+                videos ( file_name )
+            `)
+            .eq('user_id', user.id)
+            .or('is_hidden.is.null,is_hidden.eq.false')
+            .order('created_at', { ascending: false })
+
+        // video_pillars has no user_id column — scope by video_ids the user owns.
+        const userVideoIds = (tsData || []).map(t => t.video_id);
+        const { data: vpData } = userVideoIds.length > 0
+            ? await supabase.from('video_pillars').select('*').in('video_id', userVideoIds)
+            : { data: [] };
+        const videoPillars: VideoPillar[] = vpData || [];
+
+        if (!error && tsData) {
+            // Map the resolved pillars to each transcript
+            const processed = tsData.map(t => {
+                const tvps = videoPillars.filter(vp => vp.video_id === t.video_id);
+                const attachedPillars = tvps.map(vp => pillars.find(p => p.id === vp.pillar_id)).filter(Boolean) as Pillar[];
+                return {
+                    ...t,
+                    videos: Array.isArray(t.videos) ? t.videos[0] : t.videos,
+                    attachedPillars,
+                    isDeleting: false
+                }
+            }) as Transcript[];
+
+            setTranscripts(processed)
+        }
+
+        setIsLoading(false)
     }, [supabase])
+
+    useEffect(() => {
+        setIsLoading(true)
+        loadData()
+    }, [loadData])
 
     const confirmDelete = async (id: string, type: 'soft' | 'hard') => {
         try {
@@ -244,13 +247,26 @@ export default function VideoLibraryPage() {
                                                             </button>
                                                         </div>
                                                     ) : (
-                                                        <button
-                                                            onClick={() => setTranscripts(prev => prev.map(t => t.id === transcript.id ? { ...t, isDeleting: true } : t))}
-                                                            aria-label={`Delete ${transcript.videos?.file_name || 'video'}`}
-                                                            className="rounded-full p-2 text-[var(--text-primary)]/40 transition-colors hover:bg-[var(--combo-6-bg)]/10 hover:text-[var(--combo-6-bg)]"
-                                                        >
-                                                            <Trash2 className="h-4 w-4" />
-                                                        </button>
+                                                        <>
+                                                            <button
+                                                                onClick={() => {
+                                                                    setSeriesModalVideoId(transcript.video_id)
+                                                                    setSeriesModalVideoTitle(transcript.videos?.file_name)
+                                                                }}
+                                                                aria-label={`Declare ${transcript.videos?.file_name || 'video'} as part of a series`}
+                                                                title="Declare as series"
+                                                                className="rounded-full p-2 text-[var(--text-primary)]/40 transition-colors hover:bg-blue-500/10 hover:text-blue-600"
+                                                            >
+                                                                <Layers className="h-4 w-4" />
+                                                            </button>
+                                                            <button
+                                                                onClick={() => setTranscripts(prev => prev.map(t => t.id === transcript.id ? { ...t, isDeleting: true } : t))}
+                                                                aria-label={`Delete ${transcript.videos?.file_name || 'video'}`}
+                                                                className="rounded-full p-2 text-[var(--text-primary)]/40 transition-colors hover:bg-[var(--combo-6-bg)]/10 hover:text-[var(--combo-6-bg)]"
+                                                            >
+                                                                <Trash2 className="h-4 w-4" />
+                                                            </button>
+                                                        </>
                                                     )}
                                                 </div>
                                             </div>
@@ -278,6 +294,19 @@ export default function VideoLibraryPage() {
                     </div>
                 </main>
             </div>
+            <PillarSeriesDeclareModal
+                open={seriesModalVideoId !== null}
+                onClose={() => {
+                    setSeriesModalVideoId(null)
+                    setSeriesModalVideoTitle(undefined)
+                }}
+                videoId={seriesModalVideoId || ''}
+                videoTitle={seriesModalVideoTitle}
+                onSuccess={() => {
+                    showToast('Series declared. Pillar created and video tagged.', 'success')
+                    loadData()
+                }}
+            />
         </AppLayout>
     )
 }

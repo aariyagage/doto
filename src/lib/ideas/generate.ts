@@ -383,26 +383,21 @@ export async function generateIdeasForUser(args: GenerateIdeasArgs): Promise<Gen
 
     const pillarResults = await Promise.all(targetPillars.map(p => generateForPillar({ id: p.id, name: p.name })));
 
-    const allKeptWithBucket: { pillarId: string; idea: CandidateIdea }[] = [];
-    for (const r of pillarResults) {
-        for (const idea of r.kept) allKeptWithBucket.push({ pillarId: r.pillarId, idea });
-    }
-    const dedupedFlat = dedupeBySimilarity(allKeptWithBucket.map(x => x.idea));
-    const dedupedSet = new Set(dedupedFlat);
-
-    const finalByPillar = new Map<string, CandidateIdea[]>();
-    for (const { pillarId, idea } of allKeptWithBucket) {
-        if (!dedupedSet.has(idea)) continue;
-        const bucket = finalByPillar.get(pillarId) || [];
-        if (bucket.length < perPillarCount) {
-            bucket.push(idea);
-            finalByPillar.set(pillarId, bucket);
-        }
-    }
-
+    // Each pillar fills its own bucket independently. We deliberately do NOT
+    // dedupe across pillars — the same creator's voice produces phrases that
+    // overlap across pillars, and a cross-pillar Jaccard pass at 0.45 was
+    // wiping out entire pillar buckets when the first pillar's ideas happened
+    // to share vocabulary with the second's. Within-pillar dedup already runs
+    // inside filterCandidates so each pillar's set is internally distinct.
     const finalIdeas: { pillarId: string; idea: CandidateIdea }[] = [];
-    for (const [pillarId, bucket] of finalByPillar.entries()) {
-        for (const idea of bucket) finalIdeas.push({ pillarId, idea });
+    const emptyPillars: string[] = [];
+    for (const r of pillarResults) {
+        const bucket = r.kept.slice(0, perPillarCount);
+        if (bucket.length === 0) emptyPillars.push(r.pillarName);
+        for (const idea of bucket) finalIdeas.push({ pillarId: r.pillarId, idea });
+    }
+    if (emptyPillars.length > 0) {
+        console.warn(`ideas/generate: pillars produced 0 ideas after filter — ${emptyPillars.join(', ')}`);
     }
     const totalRejected = pillarResults.reduce((sum, r) => sum + r.rejected.length, 0);
 

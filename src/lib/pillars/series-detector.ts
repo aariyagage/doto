@@ -130,17 +130,28 @@ export async function detectAndPersistSeriesIfApplicable(
 
     if (closest) {
         pillarId = closest.id;
-        // Promote the existing pillar to a series. We also rewrite source_origin
-        // to 'ai_series' so regenerate's preserve logic recognises the row as a
-        // series — otherwise a promoted pillar that started as 'ai_detected'
-        // would silently be wiped on the next regenerate.
+        // Two cases:
+        //  (a) Existing pillar is_series=false → being promoted from topical to
+        //      series for the first time. Keep its name (a topical pillar like
+        //      "Cultural Commentary" shouldn't get renamed when it happens to
+        //      host a series). Just flip the flag.
+        //  (b) Existing pillar is_series=true → already a series, but maybe with
+        //      a stale or sloppy name from older code. Rewrite the name + the
+        //      description with the freshly-extracted ones so cleanup happens
+        //      naturally on the next regenerate.
+        const update: Record<string, unknown> = {
+            is_series: true,
+            series_signals: signal.signals,
+            source_origin: 'ai_series',
+        };
+        if (closest.is_series === true) {
+            update.name = seriesName;
+            update.description = description;
+            update.embedding = embedding;
+        }
         await supabase
             .from('pillars')
-            .update({
-                is_series: true,
-                series_signals: signal.signals,
-                source_origin: 'ai_series',
-            })
+            .update(update)
             .eq('id', pillarId)
             .eq('user_id', userId);
     } else {

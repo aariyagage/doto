@@ -9,7 +9,13 @@ import type { SupabaseServer } from './types';
 // LLM (which sees the full pillar list + descriptions) make the close calls.
 const TAG_FAST_THRESHOLD = 0.55;       // strong match: tag without LLM
 const TAG_AMBIGUOUS_FLOOR = 0.30;      // below this we go straight to "new pillar?"
-const TAG_SECOND_PILLAR_THRESHOLD = 0.60; // multi-tag bar (slightly higher to avoid noise)
+// Multi-tag is rare on purpose: a video should usually live in one pillar.
+// We only tag against a 2nd pillar when (a) the 2nd is itself a strong match,
+// AND (b) the gap between #1 and #2 is small — meaning the video is genuinely
+// straddling two territories, not just leaking signal into a tangentially
+// related pillar.
+const TAG_SECOND_PILLAR_THRESHOLD = 0.72;
+const TAG_SECOND_PILLAR_GAP = 0.05;
 
 interface TagOrCreateArgs {
     supabase: SupabaseServer;
@@ -52,20 +58,26 @@ async function decideTagOrCreate(
 CRITICAL: STRONG bias toward reuse. Your default answer is "tag". Only propose "new" when the video's domain is fundamentally different from EVERY existing pillar.
 
 Examples of CORRECT reuse (these MUST tag, never create new):
-- existing pillar "Productivity" + new video about "time blocking" → tag to Productivity
-- existing pillar "Productivity" + new video about "morning routine" → tag to Productivity
-- existing pillar "Productivity" + new video about "life maxxing" → tag to Productivity
-- existing pillar "Beauty" + new video about "lipstick swatches" → tag to Beauty
-- existing pillar "Beauty" + new video about "skincare routine" → tag to Beauty
-- existing pillar "Founder Diaries" + new video about "pricing experiment" → tag to Founder Diaries
+- existing "Productivity" + video about "time blocking" → tag to Productivity
+- existing "Productivity" + video about "morning routine" → tag to Productivity
+- existing "Productivity" + video about "life maxxing" → tag to Productivity
+- existing "Beauty" + video about "lipstick swatches" → tag to Beauty
+- existing "Beauty" + video about "skincare routine" → tag to Beauty
+- existing "Daily Life" + video about "a day in college" → tag to Daily Life
+- existing "Daily Life" + video about "study routine" → tag to Daily Life
+- existing "Daily Life" + video about "weekend in the city" → tag to Daily Life
+- existing "Founder Diaries" + video about "pricing experiment" → tag to Founder Diaries
 
-Examples where "new" is correct:
-- only "Productivity" exists + new video about "budget meal prep" → new "Cooking"
-- only "Beauty" exists + new video about "Q1 revenue review" → new "Founder Diaries"
+Examples where "new" is correct (genuinely different domain):
+- only "Productivity" exists + video about "budget meal prep" → new "Cooking" or "Food"
+- only "Beauty" exists + video about "Q1 revenue review" → new "Founder Diaries"
 
-A video is a SUBTOPIC under an existing pillar if any existing pillar's territory could plausibly contain it. Subtopics ARE NOT new pillars.
+If you propose a NEW pillar, name it BROADLY. Never name a new pillar after a specific aspect of one video.
+- ❌ "College Life" (a vlog about college life is just "Daily Life" or "Vlogs")
+- ❌ "Female Voice" (a video discussing how women's voices are perceived online is just "Cultural Commentary")
+- ❌ "Brand X Reviews" (one product mentioned doesn't justify a Brand X pillar — it's "Beauty" or "Reviews")
 
-When proposing "tag", also extract the specific subtopic this video covers (1-3 words, e.g. "time blocking", "lipstick swatches"). When proposing "new", leave subtopic empty.
+When proposing "tag", also extract the specific subtopic this video covers (1-3 words, e.g. "time blocking", "college life", "female voices online"). When proposing "new", leave subtopic empty.
 
 Return only valid JSON.`,
             },
@@ -172,7 +184,11 @@ export async function tagOrCreatePillarsForVideo(
         await tagVideoToPillar(supabase, videoId, top.id);
         result.tagged.push(top.id);
         const second = matches[1];
-        if (second && second.similarity >= TAG_SECOND_PILLAR_THRESHOLD) {
+        if (
+            second &&
+            second.similarity >= TAG_SECOND_PILLAR_THRESHOLD &&
+            (top.similarity - second.similarity) <= TAG_SECOND_PILLAR_GAP
+        ) {
             await tagVideoToPillar(supabase, videoId, second.id);
             result.tagged.push(second.id);
         }
@@ -217,7 +233,18 @@ export async function tagOrCreatePillarsForVideo(
             result.tagged.push(matched.id);
             return result;
         }
-        // LLM hallucinated a pillar that doesn't exist. Fall through to "new".
+        // LLM hallucinated a pillar name that doesn't exactly match any existing
+        // one. Their *intent* was clearly "tag" though — so instead of dropping
+        // through to "new" (which would create a pillar the LLM never proposed)
+        // or leaving the video untagged, fall back to the closest cosine match.
+        // This is the failure mode that produced "Uncategorized" videos in
+        // testing — LLM said "tag this to <something close>" but spelled it
+        // wrong.
+        if (top && top.similarity >= TAG_AMBIGUOUS_FLOOR) {
+            await tagVideoToPillar(supabase, videoId, top.id, decision.subtopic);
+            result.tagged.push(top.id);
+            return result;
+        }
     }
 
     if (decision.decision === 'new' && decision.name && decision.description) {

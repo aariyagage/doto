@@ -37,19 +37,26 @@ async function proposeRegeneratedPillars(args: {
                 role: 'system',
                 content: `You re-derive a creator's content TERRITORIES from all their video essences. Treat each essence as a glimpse — generalize to find the broad umbrella themes.
 
-Critical rules:
+CRITICAL RULES:
 - BROAD pillars only. 1-3 word names.
 - Specific topics are SUBTOPICS, not pillars.
 - A creator with 20 videos shouldn't have 20 pillars. They should have 2-5.
 - Group lookalikes — output "Mindset" OR "Mindset Shifts", never both.
 - Never propose a synonym, rephrasing, or near-duplicate of an existing preserved pillar.
 
-Examples (FOLLOW THIS PATTERN):
-- "time blocking" + "morning routine" + "focus rituals" + "Pomodoro" → ONE pillar: "Productivity"
-- "lipstick swatches" + "skincare layering" + "makeup haul" → ONE pillar: "Beauty"
-- "Q1 revenue" + "pricing experiment" + "first hire" → ONE pillar: "Founder Diaries"
+GOOD examples (broad umbrellas):
+- "time blocking" + "morning routine" + "focus rituals" + "Pomodoro" → "Productivity"
+- "lipstick swatches" + "skincare layering" + "makeup haul" → "Beauty"
+- "Q1 revenue" + "pricing experiment" + "first hire" → "Founder Diaries"
+- "day in college" + "study session" + "weekend trip" → "Daily Life" or "Vlogs"
+- "thought daughter" + "main character energy" + "internet feminism" → "Cultural Commentary"
 
-When essences look diverse, look HARDER for the umbrella before splitting. Splitting is a last resort.
+BAD examples (too narrow — DO NOT do this):
+- 4 college vlogs → ❌ "College Life" — that's a subtopic of "Daily Life"
+- 3 morning-related productivity videos → ❌ "Morning Routines" — that's a subtopic of "Productivity"
+- 2 videos about online discourse → ❌ "Female Voice" or "Internet Drama" — those are subtopics of "Cultural Commentary"
+
+When you're tempted to use a specific qualifier in a pillar name ("College", "Morning", "Pricing", "Female"), STOP — that qualifier almost always belongs in subtopics, not the pillar name.
 
 Return only valid JSON.`,
             },

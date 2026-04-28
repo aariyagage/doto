@@ -1,0 +1,466 @@
+import { requireEnv } from '@/lib/env';
+import Groq from 'groq-sdk';
+import type { createClient } from '@/lib/supabase/server';
+
+// -----------------------------------------------------------------------------
+// Slop filter. The idea prompt asks the model to vary titles/hooks across a
+// batch, but LLMs cluster. These checks catch the exact template patterns the
+// model kept falling back to and near-duplicate ideas so only distinct ideas
+// reach the DB.
+// -----------------------------------------------------------------------------
+
+const TITLE_TEMPLATE_PATTERNS: RegExp[] = [
+    /^The\s+\w+\s+(Paradox|Revolution|Effect|Leap|Surprise|Secret)\b/i,
+    /^The\s+(Liberating|Unexpected|Surprising|Hidden|Unknown)\s+(Power|Truth|Path|Outcome|Cost|Price|Secret)\s+of\b/i,
+    /^The\s+(Unlikely|Unexpected|Surprising)\s+(Path|Outcome|Road|Journey)\s+(to|of)\b/i,
+    /^How\s+I\s+Learned\s+to\b/i,
+    /^How\s+\w+\s+Can\s+(Lead|Transform|Change|Become)\s+(to|into)?/i,
+    /\b(Paradox|Revolution|Effect|Leap)\s*:\s*How\b/i,
+    /:\s*How\s+\w+\s+Can\s+(Lead|Transform|Change|Become)/i,
+];
+
+function titleLooksTemplated(title: string): boolean {
+    if (!title || title.trim().length === 0) return true;
+    return TITLE_TEMPLATE_PATTERNS.some((p) => p.test(title));
+}
+
+function hookIsWeak(hook: string): boolean {
+    if (!hook) return true;
+    const cleaned = hook.trim().replace(/^["“]|["”\.]$/g, '');
+    const words = cleaned.split(/\s+/).filter(Boolean);
+    if (words.length < 6) return true;
+    if (/^(i|my|we)\s+\w+\s+(my|myself|yourself|ourselves|it|this|that)\.?$/i.test(cleaned)) return true;
+    return false;
+}
+
+const STOPWORDS = new Set([
+    'the', 'a', 'an', 'and', 'or', 'but', 'of', 'in', 'on', 'at', 'to', 'for', 'with',
+    'by', 'from', 'is', 'it', 'as', 'my', 'me', 'we', 'our', 'you', 'your', 'i',
+    'can', 'will', 'has', 'have', 'had', 'was', 'were', 'be', 'been', 'this', 'that',
+    'how', 'when', 'where', 'why', 'what', 'who', 'not', 'no', 'so', 'if', 'do', 'did',
+]);
+
+function contentWords(text: string): Set<string> {
+    return new Set(
+        text
+            .toLowerCase()
+            .split(/\W+/)
+            .filter((w) => w.length > 2 && !STOPWORDS.has(w))
+    );
+}
+
+function jaccardSimilarity(a: Set<string>, b: Set<string>): number {
+    if (a.size === 0 && b.size === 0) return 0;
+    let intersection = 0;
+    for (const word of a) if (b.has(word)) intersection += 1;
+    const union = a.size + b.size - intersection;
+    return union === 0 ? 0 : intersection / union;
+}
+
+interface CandidateIdea {
+    pillar?: string;
+    tension_type?: string;
+    anchor_mode?: string;
+    anchor_moment?: string;
+    hook?: string;
+    format?: string;
+    structure?: string;
+    retention_beat?: string;
+    cta?: string;
+    title?: string;
+    description?: string;
+    reasoning?: string;
+}
+
+const ABSTRACT_ANCHOR_MARKER = '(abstract — no specific scene in transcripts)';
+
+function normalizeForMatch(s: string): string {
+    return s
+        .toLowerCase()
+        .replace(/[^\w\s]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
+function anchorIsGrounded(anchor: string, transcripts: string, windowSize = 6): boolean {
+    if (!anchor || !transcripts) return false;
+    const normAnchor = normalizeForMatch(anchor);
+    const normTranscripts = normalizeForMatch(transcripts);
+    const words = normAnchor.split(' ').filter(Boolean);
+    if (words.length < windowSize) return false;
+    for (let i = 0; i <= words.length - windowSize; i++) {
+        const window = words.slice(i, i + windowSize).join(' ');
+        if (normTranscripts.includes(window)) return true;
+    }
+    return false;
+}
+
+function dedupeBySimilarity(ideas: CandidateIdea[], threshold = 0.45): CandidateIdea[] {
+    const kept: { idea: CandidateIdea; words: Set<string> }[] = [];
+    for (const idea of ideas) {
+        const fingerprint = contentWords(`${idea.title ?? ''} ${idea.hook ?? ''} ${idea.anchor_moment ?? ''}`);
+        const duplicate = kept.some((k) => jaccardSimilarity(fingerprint, k.words) >= threshold);
+        if (!duplicate) kept.push({ idea, words: fingerprint });
+    }
+    return kept.map((k) => k.idea);
+}
+
+function filterCandidates(
+    candidates: CandidateIdea[],
+    transcripts: string
+): { kept: CandidateIdea[]; rejected: { idea: CandidateIdea; reason: string }[] } {
+    const rejected: { idea: CandidateIdea; reason: string }[] = [];
+    const firstPass: CandidateIdea[] = [];
+    for (const idea of candidates) {
+        if (titleLooksTemplated(idea.title ?? '')) {
+            rejected.push({ idea, reason: 'title matches a templated shape' });
+            continue;
+        }
+        if (hookIsWeak(idea.hook ?? '')) {
+            rejected.push({ idea, reason: 'hook too short or pronoun-verb-reflexive shape' });
+            continue;
+        }
+        const mode = (idea.anchor_mode ?? '').trim().toUpperCase();
+        const anchor = (idea.anchor_moment ?? '').trim();
+        const looksAbstract = anchor.toLowerCase().includes('abstract') && anchor.toLowerCase().includes('no specific');
+
+        if (mode === 'ABSTRACT' || looksAbstract) {
+            // ok
+        } else if (mode === 'GROUNDED' || (!mode && !looksAbstract)) {
+            if (!anchorIsGrounded(anchor, transcripts)) {
+                rejected.push({ idea, reason: 'anchor_moment claims grounded but is not found in transcripts' });
+                continue;
+            }
+        } else {
+            rejected.push({ idea, reason: `unknown anchor_mode: ${idea.anchor_mode}` });
+            continue;
+        }
+        firstPass.push(idea);
+    }
+    const deduped = dedupeBySimilarity(firstPass);
+    const droppedAsDuplicate = firstPass.filter((i) => !deduped.includes(i));
+    for (const d of droppedAsDuplicate) rejected.push({ idea: d, reason: 'too similar to an idea already kept' });
+    return { kept: deduped, rejected };
+}
+
+const SYSTEM_MESSAGE = `You are a senior creative director for a short-form-video creator. You have read this creator's transcripts. You produce ideas grounded in what they ACTUALLY said — not in what you imagine a creator like them would say.
+
+THE CARDINAL RULE — DO NOT INVENT.
+If the transcripts don't contain a specific client name, dollar amount, date, or scene, you MUST NOT add one. Every anchor is checked against the transcripts programmatically. Ideas with fabricated specifics are rejected. Abstract honesty beats fabricated specificity. If the creator's transcripts are reflective and belief-driven rather than scene-rich, your ideas should be the same — a strong point of view with no names and numbers is better than a fake client email.
+
+ANCHOR MODE — every idea declares its source. Two valid modes:
+- GROUNDED — anchor_moment is a verbatim or near-verbatim quote (≥ 8 words) lifted directly from the transcripts. The hook, title, and description may include concrete details ONLY if those details appear in the transcripts.
+- ABSTRACT — anchor_moment is the exact literal string "${ABSTRACT_ANCHOR_MARKER}". The hook, title, and description MUST NOT contain any invented proper noun, dollar amount, date, client name, place, or company. They express the creator's worldview in general but pointed terms.
+
+NEVER mix modes. Do not write a partial scene and then mark it ABSTRACT. Do not mark GROUNDED and then paraphrase beyond what the transcript contains. When in doubt, choose ABSTRACT — fabricated specifics are worse than honest abstraction.
+
+TENSION — every idea commits to one of these shapes before the hook is written:
+- reversal — the creator did the opposite of what was expected
+- confession — the creator admits something uncomfortable
+- specific_number — the idea depends on a concrete number that appears in the transcripts (GROUNDED only)
+- contradiction — two things the creator believes that appear to disagree
+- identity_challenge — a direct claim about who the viewer actually is
+- unexpected_outcome — an outcome that surprised the creator
+
+HOOK EXAMPLES — these are good REGISTERS for each mode. Imitate the register, never the words.
+
+GROUNDED hooks (use ONLY if the transcript actually contains such a scene):
+A. "I fired my best client last Tuesday. Here's the email I sent."
+B. "The day I quit my job, my boss sent me a message that just said 'good luck.'"
+C. "My first ten-thousand-dollar client paid me and then ghosted me for six weeks."
+
+ABSTRACT hooks (use when transcripts are reflective / worldview-driven — no invented specifics):
+D. "Most people optimize the wrong thing. It's almost never their pricing."
+E. "Hard work isn't what you think. It's not a virtue, it's a tax you pay once."
+F. "If your content sounds like everyone else's, you don't have a voice, you have a template."
+G. "Stop looking for your niche. It'll find you if you keep making things."
+
+Notice what the ABSTRACT ones do: they make a specific CLAIM with a clear point of view. They do NOT name a client, a dollar amount, a date, a place, or a company. That's the register to aim for when transcripts lack scenes.
+
+TITLES are important — creators scan titles to pick what to film. Rules:
+- 6–16 words
+- Descriptive enough to convey the angle at a glance
+- Has a clear point of view or contrarian stance — not a neutral summary
+- For ABSTRACT ideas, no invented specifics. For GROUNDED ideas, concrete details from the transcripts are encouraged.
+- No templated shapes: "The [Noun] [Paradox/Revolution/Effect/Leap]", "The [Adjective] Power of [Noun]", "The Unlikely Path to [Noun]", "How I Learned to [Verb]", "How [X] Can Lead to [Y]". These will be rejected programmatically.
+
+Examples of good titles:
+- "Why I'm done recommending morning routines to anyone under 30"
+- "The three words I say to every client who's about to leave"  (GROUNDED only)
+- "Stop optimizing your pricing — your packaging is the real problem"
+- "What happens when you treat discipline as a tax, not a virtue"
+
+HOOK RULES:
+- 8–18 words.
+- No pronoun-verb-reflexive shape ("I lied to myself", "My fake confidence"). Those are tweet drafts, not hooks.
+- GROUNDED hooks can contain specifics from the transcript. ABSTRACT hooks must not.
+
+INTRA-BATCH DIVERSITY — most important structural rule:
+- No two ideas may share the same tension_type.
+- Each idea must use a different format from: talking-head | story-cold-open | list | reaction | demo | green-screen-commentary | direct-address-rant.
+- No two GROUNDED ideas may anchor on the same transcript moment.
+- No two titles may share more than three substantive words.
+- If the voice profile / transcripts cannot support the requested number of DISTINCT ideas, return FEWER. Duplicates and fabrications are both failures.`;
+
+type VoiceProfileRow = {
+    niche_summary?: string | null;
+    tone_descriptors?: string[] | null;
+    content_style?: string | null;
+    recurring_phrases?: string[] | null;
+    signature_argument?: string | null;
+    enemy_or_foil?: string[] | null;
+    would_never_say?: string[] | null;
+};
+
+function buildUserMessage(params: {
+    voiceProfile: VoiceProfileRow;
+    combinedTranscripts: string;
+    pillarNames: string[];
+    requestedCount: number;
+    escalation?: string;
+}): string {
+    const { voiceProfile, combinedTranscripts, pillarNames, requestedCount, escalation } = params;
+    const escalationBlock = escalation ? `\n\nPREVIOUS ATTEMPT FAILED FILTER — ${escalation}\n` : '';
+    return `Creator voice profile:
+Niche: ${voiceProfile.niche_summary ?? '(none)'}
+Tone: ${(voiceProfile.tone_descriptors || []).join(', ') || '(none)'}
+Style: ${voiceProfile.content_style ?? '(none)'}
+Phrases they actually say: ${(voiceProfile.recurring_phrases || []).join(', ') || '(none)'}
+Signature argument (core belief): ${voiceProfile.signature_argument || '(not yet identified — work from niche + transcripts)'}
+Enemy / foil (what they push back against): ${(voiceProfile.enemy_or_foil || []).join(', ') || '(not yet identified)'}
+Things this creator would NEVER say: ${(voiceProfile.would_never_say || []).join(' | ') || '(none provided)'}
+
+Transcripts — this is the ONLY source of truth for concrete details. Any name, number, date, place, or scene used in an idea must trace back to these words:
+${combinedTranscripts}
+${escalationBlock}
+Generate ${requestedCount} Instagram Reel ideas across these pillars: ${pillarNames.join(', ')}. Aim for pillar balance. Ideas are programmatically filtered for: template titles, weak hooks, near-duplicates, and GROUNDED anchors that aren't actually in the transcripts.
+
+Before writing each idea, ask: does the transcript contain a specific moment I can anchor on? If yes, GROUNDED. If no, ABSTRACT. When in doubt, ABSTRACT. Fabricated specifics fail the filter and get thrown away.
+
+Field order for EACH idea:
+1. pillar — exact name from: ${pillarNames.join(', ')}
+2. tension_type — one of: reversal | confession | specific_number | contradiction | identity_challenge | unexpected_outcome. Do not repeat within this batch. specific_number requires GROUNDED mode.
+3. anchor_mode — "GROUNDED" or "ABSTRACT".
+4. anchor_moment — if GROUNDED: a verbatim or near-verbatim quote (≥ 8 words) lifted from the transcripts above. If ABSTRACT: the exact string "${ABSTRACT_ANCHOR_MARKER}".
+5. hook — 8 to 18 words. GROUNDED hooks may use transcript specifics; ABSTRACT hooks must not name any person, company, dollar amount, or date. No pronoun-verb-reflexive hooks ("I lied to myself" is forbidden).
+6. hook_word_count — integer. If < 8 or > 18, rewrite.
+7. format — one of: talking-head | story-cold-open | list | reaction | demo | green-screen-commentary | direct-address-rant. Do not repeat within this batch.
+8. structure — Hook (0-2s) → Pattern interrupt (3-8s) → 2–3 body beats with escalating tension → Payoff that closes the loop the hook opened.
+9. retention_beat — the specific mid-video moment designed to re-hook viewers.
+10. cta — one of save | comment | follow | DM | share, with a one-line reason it fits.
+11. title — 6 to 16 words. Descriptive, with a clear angle or POV. Creators scan this to pick what to film. For ABSTRACT ideas, no invented specifics. No templated shapes.
+12. description — how the creator would uniquely execute this, grounded in their voice and (for GROUNDED ideas) the anchor_moment.
+
+Return ONLY a JSON object with this exact shape:
+{ "ideas": [ { ...all fields above... }, ... ] }`;
+}
+
+async function callGroq(groq: Groq, systemMessage: string, userMessage: string): Promise<CandidateIdea[]> {
+    const completion = await groq.chat.completions.create({
+        model: 'llama-3.3-70b-versatile',
+        messages: [
+            { role: 'system', content: systemMessage },
+            { role: 'user', content: userMessage },
+        ],
+        temperature: 0.85,
+        response_format: { type: 'json_object' },
+    });
+    let content = completion.choices[0]?.message?.content || '{}';
+    if (content.startsWith('```json')) content = content.replace(/^```json\n/, '').replace(/\n```$/, '');
+    else if (content.startsWith('```')) content = content.replace(/^```\n/, '').replace(/\n```$/, '');
+    const parsed = JSON.parse(content.trim());
+    if (Array.isArray(parsed)) return parsed as CandidateIdea[];
+    if (parsed && Array.isArray(parsed.ideas)) return parsed.ideas as CandidateIdea[];
+    if (parsed && typeof parsed === 'object') return [parsed as CandidateIdea];
+    return [];
+}
+
+// -----------------------------------------------------------------------------
+// Public API: generateIdeasForUser. Auth + rate-limiting are the route handler's
+// job — this function trusts its caller.
+// -----------------------------------------------------------------------------
+
+export interface GenerateIdeasArgs {
+    supabase: ReturnType<typeof createClient>;
+    userId: string;
+    pillarIds?: string[];      // empty = generate for all of the user's pillars
+    perPillarCount?: number;   // default 3, capped at 5
+}
+
+export interface GenerateIdeasResult {
+    inserted: { id: string; pillar_id: string | null; title: string | null }[];
+    insertedRaw: unknown[];
+    pillarsCovered: number;
+    totalRejected: number;
+    error?: string;
+}
+
+export async function generateIdeasForUser(args: GenerateIdeasArgs): Promise<GenerateIdeasResult> {
+    const { supabase, userId } = args;
+    const pillar_ids = Array.isArray(args.pillarIds) ? args.pillarIds : [];
+    const perPillarCount = Math.max(1, Math.min(args.perPillarCount ?? 3, 5));
+
+    const { data: voiceProfile, error: vpError } = await supabase
+        .from('voice_profile')
+        .select('*')
+        .eq('user_id', userId)
+        .single();
+
+    if (vpError || !voiceProfile) {
+        return { inserted: [], insertedRaw: [], pillarsCovered: 0, totalRejected: 0, error: 'No voice profile found. Upload videos first.' };
+    }
+
+    let pillarsQuery = supabase.from('pillars').select('id, name').eq('user_id', userId);
+    if (pillar_ids.length > 0) pillarsQuery = pillarsQuery.in('id', pillar_ids);
+    const { data: pillars, error: pillarsError } = await pillarsQuery;
+    if (pillarsError) throw new Error(`Failed to fetch pillars: ${pillarsError.message}`);
+    const targetPillars = pillars || [];
+    if (targetPillars.length === 0) {
+        return { inserted: [], insertedRaw: [], pillarsCovered: 0, totalRejected: 0, error: 'No pillars to generate for. Upload videos first or pick a different filter.' };
+    }
+
+    const groq = new Groq({ apiKey: requireEnv('GROQ_API_KEY') });
+    const overGeneratePerPillar = perPillarCount + 2;
+
+    async function generateForPillar(pillar: { id: string; name: string }): Promise<{
+        pillarId: string;
+        pillarName: string;
+        kept: CandidateIdea[];
+        rejected: { idea: CandidateIdea; reason: string }[];
+    }> {
+        const { data: vpData } = await supabase
+            .from('video_pillars')
+            .select('video_id')
+            .eq('pillar_id', pillar.id);
+        const videoIds = (vpData || []).map(vp => vp.video_id as string);
+
+        let transcriptsData: { raw_text: string; word_count: number }[] = [];
+        if (videoIds.length > 0) {
+            const { data: tData } = await supabase
+                .from('transcripts')
+                .select('raw_text, word_count')
+                .eq('user_id', userId)
+                .in('video_id', videoIds)
+                .order('word_count', { ascending: false })
+                .limit(5);
+            transcriptsData = tData || [];
+        }
+        if (transcriptsData.length === 0) {
+            const { data: tData } = await supabase
+                .from('transcripts')
+                .select('raw_text, word_count')
+                .eq('user_id', userId)
+                .order('word_count', { ascending: false })
+                .limit(5);
+            transcriptsData = tData || [];
+        }
+
+        let combinedTranscripts = transcriptsData.slice(0, 3).map(t => t.raw_text).join('\n---\n');
+        if (combinedTranscripts.length > 4000) combinedTranscripts = combinedTranscripts.substring(0, 4000);
+
+        const userMsg = buildUserMessage({
+            voiceProfile: voiceProfile as VoiceProfileRow,
+            combinedTranscripts,
+            pillarNames: [pillar.name],
+            requestedCount: overGeneratePerPillar,
+        });
+
+        let candidates: CandidateIdea[] = [];
+        try {
+            candidates = await callGroq(groq, SYSTEM_MESSAGE, userMsg);
+        } catch (err) {
+            console.error(`ideas/generate pillar="${pillar.name}" Groq failed:`, err);
+            return { pillarId: pillar.id, pillarName: pillar.name, kept: [], rejected: [] };
+        }
+        for (const c of candidates) c.pillar = pillar.name;
+
+        const { kept, rejected } = filterCandidates(candidates, combinedTranscripts);
+        console.log(
+            `ideas/generate pillar="${pillar.name}" candidates=${candidates.length} kept=${kept.length} rejected=${rejected.length}`
+        );
+        return { pillarId: pillar.id, pillarName: pillar.name, kept, rejected };
+    }
+
+    const pillarResults = await Promise.all(targetPillars.map(p => generateForPillar({ id: p.id, name: p.name })));
+
+    const allKeptWithBucket: { pillarId: string; idea: CandidateIdea }[] = [];
+    for (const r of pillarResults) {
+        for (const idea of r.kept) allKeptWithBucket.push({ pillarId: r.pillarId, idea });
+    }
+    const dedupedFlat = dedupeBySimilarity(allKeptWithBucket.map(x => x.idea));
+    const dedupedSet = new Set(dedupedFlat);
+
+    const finalByPillar = new Map<string, CandidateIdea[]>();
+    for (const { pillarId, idea } of allKeptWithBucket) {
+        if (!dedupedSet.has(idea)) continue;
+        const bucket = finalByPillar.get(pillarId) || [];
+        if (bucket.length < perPillarCount) {
+            bucket.push(idea);
+            finalByPillar.set(pillarId, bucket);
+        }
+    }
+
+    const finalIdeas: { pillarId: string; idea: CandidateIdea }[] = [];
+    for (const [pillarId, bucket] of finalByPillar.entries()) {
+        for (const idea of bucket) finalIdeas.push({ pillarId, idea });
+    }
+    const totalRejected = pillarResults.reduce((sum, r) => sum + r.rejected.length, 0);
+
+    if (finalIdeas.length === 0) {
+        return { inserted: [], insertedRaw: [], pillarsCovered: 0, totalRejected, error: 'Could not generate any distinct ideas. Try again or upload more varied transcripts.' };
+    }
+
+    const insertedRaw: unknown[] = [];
+    const inserted: { id: string; pillar_id: string | null; title: string | null }[] = [];
+    const insertErrors: { title: string | undefined; error: string }[] = [];
+
+    for (const { pillarId, idea } of finalIdeas) {
+        const reasoningParts = [
+            idea.description || idea.reasoning,
+            idea.tension_type ? `Tension: ${idea.tension_type}` : null,
+            idea.anchor_mode ? `Anchor mode: ${idea.anchor_mode}` : null,
+            idea.anchor_moment ? `Anchor moment: ${idea.anchor_moment}` : null,
+            idea.format ? `Format: ${idea.format}` : null,
+            idea.retention_beat ? `Retention beat: ${idea.retention_beat}` : null,
+            idea.cta ? `CTA: ${idea.cta}` : null,
+        ].filter(Boolean);
+
+        const { data: row, error: insertError } = await supabase
+            .from('content_ideas')
+            .insert({
+                user_id: userId,
+                title: idea.title,
+                hook: idea.hook,
+                structure: idea.structure,
+                reasoning: reasoningParts.join('\n\n'),
+                pillar_id: pillarId,
+                is_saved: false,
+                is_used: false,
+            })
+            .select()
+            .single();
+
+        if (insertError) {
+            console.error('Failed to insert idea:', JSON.stringify(insertError));
+            insertErrors.push({ title: idea.title, error: insertError.message });
+        } else if (row) {
+            insertedRaw.push(row);
+            inserted.push({
+                id: (row as { id: string }).id,
+                pillar_id: (row as { pillar_id: string | null }).pillar_id,
+                title: (row as { title: string | null }).title,
+            });
+        }
+    }
+
+    console.log(
+        `ideas/generate summary — pillars=${targetPillars.length} per_pillar=${perPillarCount} final=${finalIdeas.length} inserted=${inserted.length} failed=${insertErrors.length} total_rejected=${totalRejected}`
+    );
+
+    return {
+        inserted,
+        insertedRaw,
+        pillarsCovered: targetPillars.length,
+        totalRejected,
+    };
+}

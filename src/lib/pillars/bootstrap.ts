@@ -29,19 +29,27 @@ async function proposeBootstrapPillars(
                 role: 'system',
                 content: `You map a creator's content TERRITORIES from video summaries. Treat each summary as a glimpse — generalize to find the broad umbrella theme that contains it.
 
-Critical rules:
-- Output 1-3 BROAD pillars only. Pillar names are 1-3 words.
+CRITICAL RULES:
+- Output 1-3 BROAD pillars only. Pillar names are 1-3 words. NEVER more than 3.
 - Specific topics are SUBTOPICS, not pillars.
-- If multiple videos share a theme — even tangentially — they MUST go under one pillar.
-- A creator who has uploaded 5 videos shouldn't have 5 pillars. They should have 1-2.
+- If multiple videos share a vibe, format, or umbrella — even tangentially — they MUST go under one pillar.
+- A creator who uploaded 5 videos shouldn't have 5 pillars. They should have 1-2.
+- DO NOT name a pillar after a specific aspect of one video. Name it after the territory all the videos collectively occupy.
 
-Examples of broad-vs-narrow (FOLLOW THIS PATTERN):
-- "time blocking" + "morning routine" + "focus rituals" → ONE pillar: "Productivity" (subtopics: time blocking, morning routine, focus rituals)
-- "lipstick swatches" + "skincare layering" → ONE pillar: "Beauty" (subtopics: lipstick, skincare)
-- "Q1 revenue review" + "pricing experiment" → ONE pillar: "Founder Diaries" (subtopics: revenue, pricing)
-- "thought daughter aesthetic" + "main character energy" → ONE pillar: "Cultural Commentary"
+GOOD examples (broad umbrellas):
+- 4 vlogs about a college student's day → "Daily Life" or "Vlogs" (NOT "College Life", "Study Routines", or "Campus Diaries" — those are subtopics)
+- "time blocking" + "morning routine" + "focus rituals" → "Productivity" (subtopics: time blocking, morning routine, focus rituals)
+- "lipstick swatches" + "skincare layering" + "haul" → "Beauty"
+- "Q1 revenue" + "pricing experiment" + "first hire" → "Founder Diaries"
+- "thought daughter aesthetic" + "main character energy" → "Cultural Commentary"
+- "what i eat in a day" + "groceries" + "meal prep" → "Food" or "Lifestyle"
 
-When essences look diverse, look HARDER for the umbrella before splitting. Splitting is a last resort.
+BAD examples (too narrow — DO NOT do this):
+- 4 vlogs from a college student → ❌ "College Life" (this is a subtopic of "Daily Life")
+- 3 makeup videos featuring a specific brand → ❌ "Brand X Reviews" (this is a subtopic of "Beauty")
+- 2 productivity videos about mornings → ❌ "Morning Routines" (this is a subtopic of "Productivity")
+
+When you're tempted to use a specific qualifier in the pillar name (e.g. "College", "Morning", "Pricing"), STOP — that qualifier almost always belongs in subtopics, not the pillar name. The pillar name should still apply if the creator uploads adjacent content next month.
 
 Return only valid JSON. No markdown.`,
             },

@@ -33,11 +33,27 @@ export async function detectSeriesSignals(transcript: string, groq: Groq): Promi
         messages: [
             {
                 role: 'system',
-                content: 'Detect whether this transcript opens like a recurring series — branded intro, episode number, or a phrase like "welcome to my X series". Be conservative: a single mention of "episode" inside a casual aside does NOT count. Only flag is_series=true when the creator is clearly labeling this video as part of a named recurring series. Return only valid JSON.',
+                content: `Detect whether this transcript opens like a recurring branded series — episode number, named segment, or a phrase like "welcome to my X". Be conservative: a single passing mention of "episode" doesn't count. Only flag is_series=true when the creator is clearly labeling this video as part of a named recurring series.
+
+CRITICAL — series_name extraction rules:
+- Extract ONLY the name. NOT the framing words around it.
+- Title Case. 2 to 5 words. No more.
+- Strip leading "my", "the", "a", "this".
+- Strip trailing words like "series", "diaries", "saturdays", "videos" UNLESS they're inseparable from the name (creators often say "my X series" — keep just X unless X alone makes no sense).
+- Strip explanatory phrases. The creator might say "welcome to my series where I talk about things I've been thinking about" — the NAME there is "Things I've Been Thinking About", not the entire framing sentence.
+
+Examples:
+- "welcome to my series where I talk about things I've been thinking about" → "Things I've Been Thinking About"
+- "this is episode 4 of solopreneur saturdays" → "Solopreneur Saturdays"
+- "welcome back to thought daughter diaries" → "Thought Daughter Diaries"
+- "today on the founder log" → "Founder Log"
+- "part 3 of my mindset reset series" → "Mindset Reset"
+
+Return only valid JSON.`,
             },
             {
                 role: 'user',
-                content: `First 1500 chars of transcript:\n${window}\n\nReturn JSON: { "is_series": boolean, "series_name": string | null, "signals": string[] (the literal phrases that triggered detection — empty array if is_series=false) }`,
+                content: `First 1500 chars of transcript:\n${window}\n\nReturn JSON: { "is_series": boolean, "series_name": string | null (2-5 words, Title Case, JUST the name), "signals": string[] (the literal phrases from the transcript that triggered detection — empty array if is_series=false) }`,
             },
         ],
     });
@@ -48,9 +64,20 @@ export async function detectSeriesSignals(transcript: string, groq: Groq): Promi
     else if (raw.startsWith('```')) raw = raw.replace(/^```\n?/, '').replace(/\n?```$/, '');
 
     const parsed = JSON.parse(raw) as Partial<SeriesSignal>;
+    let seriesName: string | null = null;
+    if (typeof parsed.series_name === 'string' && parsed.series_name.trim()) {
+        // Defensive trimming in case the LLM ignores the prompt rules and returns
+        // a long phrase. Cap at 5 words / 50 chars; if it's longer, refuse rather
+        // than persist a bad pillar name.
+        const cleaned = parsed.series_name.trim().replace(/^(my|the|a|this)\s+/i, '');
+        const wordCount = cleaned.split(/\s+/).length;
+        if (wordCount <= 5 && cleaned.length <= 50) {
+            seriesName = cleaned;
+        }
+    }
     return {
-        is_series: parsed.is_series === true,
-        series_name: typeof parsed.series_name === 'string' && parsed.series_name.trim() ? parsed.series_name.trim() : null,
+        is_series: parsed.is_series === true && seriesName !== null,
+        series_name: seriesName,
         signals: Array.isArray(parsed.signals) ? parsed.signals.filter(s => typeof s === 'string') : [],
     };
 }

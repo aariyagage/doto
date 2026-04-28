@@ -14,6 +14,7 @@ import { ensureEssenceForTranscript } from '@/lib/pillars/essence';
 import { bootstrapPillarsForUser } from '@/lib/pillars/bootstrap';
 import { tagOrCreatePillarsForVideo } from '@/lib/pillars/tag-or-create';
 import { detectAndPersistSeriesIfApplicable } from '@/lib/pillars/series-detector';
+import { topUpIdeasForPillars } from '@/lib/pillars/auto-ideas';
 
 ffmpeg.setFfmpegPath(ffmpegInstaller.path);
 
@@ -315,6 +316,27 @@ export async function POST(request: Request) {
                         // the pillar block threw — the upload-context listener should
                         // still proceed and re-fetch (it'll get whatever exists).
                         sendEvent({ step: 'pillars_ready' });
+
+                        // 5. Auto-generate ideas for any pillar this video was
+                        //    tagged to (only tops up to 3 unused — won't repeat
+                        //    work if the user already has fresh ideas pending).
+                        //    Non-fatal.
+                        try {
+                            const { data: tagged } = await supabase
+                                .from('video_pillars')
+                                .select('pillar_id')
+                                .eq('video_id', videoId);
+                            const taggedPillarIds = (tagged || []).map(t => t.pillar_id as string).filter(Boolean);
+                            if (taggedPillarIds.length > 0) {
+                                const result = await topUpIdeasForPillars({
+                                    supabase, groq, userId: user.id, pillarIds: taggedPillarIds,
+                                });
+                                console.log(`auto-ideas video=${videoId} pillars=${taggedPillarIds.length} generated=${result.generated} toppedUp=${result.pillarsToppedUp}`);
+                            }
+                        } catch (ideasErr) {
+                            console.error('Auto idea top-up failed (non-fatal):', ideasErr);
+                        }
+                        sendEvent({ step: 'ideas_ready' });
                     }
                     // --- END PILLAR PIPELINE ---
 

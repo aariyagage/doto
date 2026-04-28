@@ -191,10 +191,19 @@ export default function VideoLibraryPage() {
                                                             {transcript.attachedPillars.map(p => (
                                                                 <span
                                                                     key={p.id}
-                                                                    className="inline-flex items-center rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider"
+                                                                    className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider"
                                                                     style={{ backgroundColor: p.color, color: getPairedTextColor(p.color) }}
                                                                 >
                                                                     {p.name}
+                                                                    {p.is_series && (
+                                                                        <span
+                                                                            className="rounded-sm px-1 text-[8px] font-bold"
+                                                                            style={{ backgroundColor: 'rgba(0,0,0,0.15)', color: getPairedTextColor(p.color) }}
+                                                                            title="Series pillar"
+                                                                        >
+                                                                            Series
+                                                                        </span>
+                                                                    )}
                                                                 </span>
                                                             ))}
                                                         </div>

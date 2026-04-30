@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { ArrowUpRight } from 'lucide-react'
+import HeroHeadline from '@/components/landing/HeroHeadline'
 import WorkspaceShelf from '@/components/landing/WorkspaceShelf'
 import Bento from '@/components/landing/Bento'
 import SpecsStrip from '@/components/landing/SpecsStrip'
@@ -33,9 +34,7 @@ export default function Home() {
                 <div className="text-caption text-ink-muted mb-8">
                     A creator&rsquo;s content workspace
                 </div>
-                <h1 className="text-display-1 text-ink text-balance">
-                    Your brain, organized into content.
-                </h1>
+                <HeroHeadline />
                 <p className="mt-8 text-body-lg text-ink-muted max-w-2xl text-pretty">
                     Upload your videos. We transcribe them, surface your content pillars, and draft new ideas in your exact voice — filed and ready when you need them.
                 </p>

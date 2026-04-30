@@ -41,13 +41,13 @@ export default function LoginPage() {
 
     return (
         <div className="flex min-h-screen flex-col items-center justify-center bg-[var(--bg-primary)] p-4">
-            <Link href="/" className="font-caslon italic font-bold text-4xl tracking-tighter mb-6 text-[var(--text-primary)] hover:opacity-80 transition-opacity">
+            <Link href="/" className="font-semibold text-3xl tracking-tight mb-6 text-[var(--text-primary)] hover:opacity-80 transition-opacity">
                 doto
             </Link>
-            <Card className="w-full max-w-md bg-[var(--bg-panel)] border-gray-200 dark:border-gray-800 shadow-lg rounded-2xl">
+            <Card className="w-full max-w-md bg-[var(--bg-panel)] border-[var(--border-manila)] shadow-sm rounded-2xl">
                 <CardHeader>
-                    <CardTitle className="font-heading text-2xl tracking-tight">Welcome back</CardTitle>
-                    <CardDescription className="font-ui">Sign in to your account.</CardDescription>
+                    <CardTitle className="text-2xl font-semibold tracking-tight">Welcome back</CardTitle>
+                    <CardDescription>Sign in to your account.</CardDescription>
                 </CardHeader>
                 <CardContent>
                     <form onSubmit={handleSubmit} className="space-y-4">
@@ -88,7 +88,7 @@ export default function LoginPage() {
                         {error && <p role="alert" className="text-sm text-[var(--combo-6-bg)] font-medium">{error}</p>}
                         <Button
                             type="submit"
-                            className="w-full rounded-full bg-[var(--text-primary)] text-[var(--bg-primary)] hover:scale-[1.02] transition-transform font-heading h-11"
+                            className="w-full rounded-full bg-[var(--text-primary)] text-[var(--bg-primary)] hover:opacity-90 transition-opacity font-medium h-11"
                             disabled={loading}
                         >
                             {loading ? 'Signing in…' : 'Log in'}
@@ -96,7 +96,7 @@ export default function LoginPage() {
                     </form>
                 </CardContent>
                 <CardFooter className="flex justify-center">
-                    <Link href="/signup" className="text-sm font-ui text-[var(--muted-foreground)] hover:text-[var(--text-primary)] transition-colors">
+                    <Link href="/signup" className="text-sm text-[var(--muted-foreground)] hover:text-[var(--text-primary)] transition-colors">
                         Don&apos;t have an account? <span className="underline underline-offset-4">Sign up</span>
                     </Link>
                 </CardFooter>

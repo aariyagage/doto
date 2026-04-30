@@ -414,7 +414,7 @@ export default function IdeasPage() {
                     <div className="w-full max-w-7xl mx-auto space-y-8">
                         {/* Top Bar */}
                         <div className="flex items-center justify-between mb-8">
-                            <h1 className="text-2xl md:text-4xl font-heading uppercase tracking-tight text-gray-900 dark:text-white">Content Ideas</h1>
+                            <h1 className="text-3xl md:text-[34px] font-semibold tracking-tight text-[var(--text-primary)]">Ideas</h1>
                             <div className="flex items-center gap-3">
                                 {ideas.length > 0 && (
                                     <Button
@@ -448,7 +448,7 @@ export default function IdeasPage() {
                         <div className="mb-4">
                             <div className="flex items-start justify-between mb-5">
                                 <div>
-                                    <h3 className="text-lg font-bold font-heading text-gray-900 dark:text-white leading-tight">Your Content Pillars</h3>
+                                    <h3 className="text-base font-semibold tracking-tight text-[var(--text-primary)] leading-tight">Your content pillars</h3>
                                     <p className="text-[var(--muted-foreground)] font-ui text-sm mt-1">Auto-generated from your voice profile. Select pillars to filter ideas.</p>
                                 </div>
                                 <div className="flex items-center gap-2">
@@ -456,7 +456,7 @@ export default function IdeasPage() {
                                         <button
                                             onClick={deleteAllPillars}
                                             disabled={isDeletingPillars}
-                                            className="text-xs font-bold font-heading text-red-500 hover:text-red-600 transition-colors flex items-center whitespace-nowrap bg-red-50 dark:bg-red-500/10 hover:bg-red-100 dark:hover:bg-red-500/20 px-3 py-1.5 rounded-lg"
+                                            className="text-xs font-medium text-red-500 hover:text-red-600 transition-colors flex items-center whitespace-nowrap bg-red-50 dark:bg-red-500/10 hover:bg-red-100 dark:hover:bg-red-500/20 px-3 py-1.5 rounded-lg"
                                         >
                                             {isDeletingPillars ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : <Trash2 className="h-4 w-4 mr-1.5" />}
                                             Clear all
@@ -469,7 +469,7 @@ export default function IdeasPage() {
                                         <button
                                             onClick={regeneratePillars}
                                             disabled={isRegeneratingPillars}
-                                            className="text-xs font-bold font-heading text-blue-600 hover:text-blue-700 transition-colors flex items-center whitespace-nowrap bg-blue-50 dark:bg-blue-500/10 hover:bg-blue-100 px-3 py-1.5 rounded-lg"
+                                            className="text-xs font-medium text-blue-600 hover:text-blue-700 transition-colors flex items-center whitespace-nowrap bg-blue-50 dark:bg-blue-500/10 hover:bg-blue-100 px-3 py-1.5 rounded-lg"
                                         >
                                             {isRegeneratingPillars ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : <RefreshCw className="h-4 w-4 mr-1.5" />}
                                             Regenerate
@@ -498,7 +498,7 @@ export default function IdeasPage() {
                                     <button
                                         onClick={regeneratePillars}
                                         disabled={isRegeneratingPillars}
-                                        className="text-xs font-bold font-heading text-blue-700 dark:text-blue-200 hover:underline whitespace-nowrap"
+                                        className="text-xs font-medium text-blue-700 dark:text-blue-200 hover:underline whitespace-nowrap"
                                     >
                                         {isRegeneratingPillars ? 'Regenerating…' : 'Regenerate →'}
                                     </button>
@@ -525,7 +525,7 @@ export default function IdeasPage() {
                                         style={{ borderTopLeftRadius: '0.75rem' }}
                                     >
                                         <div className={`absolute -top-2.5 left-0 w-1/2 h-3.5 rounded-t-lg ${selectedPillars.length === 0 ? 'bg-gray-900 dark:bg-white' : 'bg-gray-200 dark:bg-gray-800'}`}></div>
-                                        <span className="font-heading font-bold text-xs relative z-10">All Ideas</span>
+                                        <span className="font-medium text-xs relative z-10">All ideas</span>
                                     </div>
                                 )}
 
@@ -579,14 +579,14 @@ export default function IdeasPage() {
                                                     e.stopPropagation();
                                                     startEditingPillar(p.id, p.name);
                                                 }}
-                                                className={`text-[9px] tracking-widest uppercase font-heading ${isSelected ? 'font-bold' : 'font-medium'} hover:underline decoration-black/30 underline-offset-2 relative z-10`}
+                                                className={`text-[11px] ${isSelected ? 'font-semibold' : 'font-medium'} hover:underline decoration-black/30 underline-offset-2 relative z-10`}
                                                 title="Click to rename"
                                             >
                                                 {p.name}
                                             </span>
                                             {p.is_series && (
                                                 <span
-                                                    className={`text-[8px] tracking-widest uppercase font-heading font-bold rounded-sm px-1 py-0.5 relative z-10 ${isSelected ? 'bg-black/10 text-black/70' : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300'}`}
+                                                    className={`text-[10px] font-semibold rounded-sm px-1 py-0.5 relative z-10 ${isSelected ? 'bg-black/10 text-black/70' : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300'}`}
                                                     title="Series pillar"
                                                 >
                                                     Series
@@ -611,7 +611,7 @@ export default function IdeasPage() {
                                 <button
                                     key={status}
                                     onClick={() => setFilterStatus(status as any)}
-                                    className={`px-3 py-1 text-xs font-bold font-heading rounded-md transition-colors ${filterStatus === status ? 'bg-[var(--bg-panel)] shadow-sm text-gray-900 dark:text-white' : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-300'}`}
+                                    className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${filterStatus === status ? 'bg-[var(--bg-panel)] shadow-sm text-[var(--text-primary)]' : 'text-[var(--text-primary)]/55 hover:text-[var(--text-primary)]'}`}
                                 >
                                     {status}
                                 </button>
@@ -679,7 +679,7 @@ export default function IdeasPage() {
                                             {/* Card Top Row - Pillar Badge Only */}
                                             <div className="mb-3 flex items-center justify-between">
                                                 <span
-                                                    className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[9px] font-bold uppercase tracking-widest ${isDefault ? 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300' : 'bg-black/10 text-gray-900'}`}
+                                                    className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-medium ${isDefault ? 'bg-[var(--text-primary)]/[0.06] text-[var(--text-primary)]/65' : 'bg-black/10 text-gray-900'}`}
                                                 >
                                                     {pillar?.name || 'Uncategorized'}
                                                 </span>
@@ -692,15 +692,15 @@ export default function IdeasPage() {
                                             </div>
 
                                             {/* Title */}
-                                            <h2 className={`text-xl md:text-2xl font-bold font-heading leading-tight mb-5 ${isDefault ? 'text-gray-900 dark:text-white' : 'text-gray-900'}`}>
+                                            <h2 className={`text-xl md:text-2xl font-semibold tracking-tight leading-tight mb-5 ${isDefault ? 'text-[var(--text-primary)]' : 'text-gray-900'}`}>
                                                 {idea.title}
                                             </h2>
 
                                             {/* Hook Section */}
                                             <div className="mb-5">
-                                                <span className={`text-[9px] uppercase font-bold tracking-widest block mb-1.5 ${isDefault ? 'text-gray-400' : 'text-black/50'}`}>HOOK</span>
-                                                <p className={`text-base md:text-lg font-medium font-ui italic ${isDefault ? 'text-gray-800 dark:text-gray-200' : 'text-gray-900'}`}>
-                                                    "{idea.hook}"
+                                                <span className={`text-[11px] font-semibold block mb-1.5 ${isDefault ? 'text-[var(--text-primary)]/45' : 'text-black/50'}`}>Hook</span>
+                                                <p className={`text-base md:text-lg font-medium ${isDefault ? 'text-[var(--text-primary)]/85' : 'text-gray-900'}`}>
+                                                    &ldquo;{idea.hook}&rdquo;
                                                 </p>
                                             </div>
 
@@ -708,20 +708,20 @@ export default function IdeasPage() {
                                             <div className={`mb-6 pt-4 border-t ${isDefault ? 'border-gray-100 dark:border-gray-800' : 'border-black/10'}`}>
                                                 <button
                                                     onClick={() => setIdeas(prev => prev.map(i => i.id === idea.id ? { ...i, isExpanded: !idea.isExpanded } : i))}
-                                                    className={`flex items-center text-xs font-bold font-heading uppercase tracking-wider transition-colors ${isDefault ? 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white' : 'text-black/70 hover:text-black'}`}
+                                                    className={`flex items-center text-xs font-medium transition-colors ${isDefault ? 'text-[var(--text-primary)]/60 hover:text-[var(--text-primary)]' : 'text-black/70 hover:text-black'}`}
                                                 >
                                                     {idea.isExpanded ? (
                                                         <><ChevronUp className="mr-1 h-3.5 w-3.5" /> Less</>
                                                     ) : (
-                                                        <><ChevronDown className="mr-1 h-3.5 w-3.5" /> Structure &amp; Concept</>
+                                                        <><ChevronDown className="mr-1 h-3.5 w-3.5" /> Structure &amp; concept</>
                                                     )}
                                                 </button>
 
                                                 {idea.isExpanded && (
                                                     <div className={`mt-5 space-y-5 rounded-2xl p-5 md:p-6 animate-in slide-in-from-top-2 fade-in duration-200 ${isDefault ? 'bg-gray-50 dark:bg-gray-800/50' : 'bg-black/5'}`}>
                                                         <div>
-                                                            <span className={`text-[10px] uppercase font-bold tracking-widest block mb-2 ${isDefault ? 'text-gray-400 dark:text-gray-500' : 'text-black/40'}`}>STRUCTURE</span>
-                                                            <p className={`text-sm leading-relaxed whitespace-pre-wrap font-ui ${isDefault ? 'text-gray-700 dark:text-gray-300' : 'text-gray-900'}`}>
+                                                            <span className={`text-[11px] font-semibold block mb-2 ${isDefault ? 'text-[var(--text-primary)]/45' : 'text-black/40'}`}>Structure</span>
+                                                            <p className={`text-sm leading-relaxed whitespace-pre-wrap ${isDefault ? 'text-[var(--text-primary)]/75' : 'text-gray-900'}`}>
                                                                 {idea.structure.split('→').map((step, idx, arr) => (
                                                                     <span key={idx}>
                                                                         {step.trim()}
@@ -731,8 +731,8 @@ export default function IdeasPage() {
                                                             </p>
                                                         </div>
                                                         <div>
-                                                            <span className={`text-[10px] uppercase font-bold tracking-widest block mb-2 ${isDefault ? 'text-gray-400 dark:text-gray-500' : 'text-black/40'}`}>CONCEPT</span>
-                                                            <p className={`text-sm leading-relaxed font-ui ${isDefault ? 'text-gray-700 dark:text-gray-300' : 'text-gray-900'}`}>{idea.reasoning}</p>
+                                                            <span className={`text-[11px] font-semibold block mb-2 ${isDefault ? 'text-[var(--text-primary)]/45' : 'text-black/40'}`}>Concept</span>
+                                                            <p className={`text-sm leading-relaxed ${isDefault ? 'text-[var(--text-primary)]/75' : 'text-gray-900'}`}>{idea.reasoning}</p>
                                                         </div>
                                                     </div>
                                                 )}
@@ -743,7 +743,7 @@ export default function IdeasPage() {
                                                 <div className="flex items-center gap-4">
                                                     <button
                                                         onClick={() => regenerateIdea(idea.id, idea.pillar_id)}
-                                                        className={`text-[11px] font-bold font-heading uppercase tracking-widest transition-colors flex items-center ${isDefault ? 'text-gray-400 dark:text-gray-500 hover:text-gray-900 dark:hover:text-white' : 'text-black/50 hover:text-black'}`}
+                                                        className={`text-xs font-medium transition-colors flex items-center ${isDefault ? 'text-[var(--text-primary)]/50 hover:text-[var(--text-primary)]' : 'text-black/50 hover:text-black'}`}
                                                     >
                                                         ↺ Regenerate
                                                     </button>
@@ -753,14 +753,14 @@ export default function IdeasPage() {
                                                     <button
                                                         onClick={() => markAsUsed(idea.id)}
                                                         disabled={idea.is_used}
-                                                        className={`flex items-center px-3 py-1.5 rounded-lg text-[11px] font-bold font-heading uppercase tracking-widest transition-colors ${idea.is_used ? (isDefault ? 'bg-green-50 text-green-600 dark:bg-green-500/10 dark:text-green-400' : 'bg-black/10 text-gray-900') : (isDefault ? 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700' : 'bg-black/5 text-black/70 hover:bg-black/10')}`}
+                                                        className={`flex items-center px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${idea.is_used ? (isDefault ? 'bg-green-50 text-green-600 dark:bg-green-500/10 dark:text-green-400' : 'bg-black/10 text-gray-900') : (isDefault ? 'bg-[var(--text-primary)]/[0.06] text-[var(--text-primary)]/65 hover:bg-[var(--text-primary)]/[0.1]' : 'bg-black/5 text-black/70 hover:bg-black/10')}`}
                                                     >
                                                         {idea.is_used && <Check className="mr-1.5 h-3.5 w-3.5" />}
-                                                        {idea.is_used ? 'Used' : 'Mark Used'}
+                                                        {idea.is_used ? 'Used' : 'Mark used'}
                                                     </button>
 
                                                     {idea.isDeleting ? (
-                                                        <div className={`flex items-center gap-2 text-xs font-bold font-heading uppercase tracking-widest border rounded-xl px-3 py-2 ${isDefault ? 'bg-red-50 border-red-100 dark:bg-red-500/10 dark:border-red-500/20' : 'bg-red-500/20 border-red-500/30'}`}>
+                                                        <div className={`flex items-center gap-2 text-xs font-medium border rounded-xl px-3 py-2 ${isDefault ? 'bg-red-50 border-red-100 dark:bg-red-500/10 dark:border-red-500/20' : 'bg-red-500/20 border-red-500/30'}`}>
                                                             <button onClick={() => confirmDelete(idea.id)} className={`${isDefault ? 'text-red-600 dark:text-red-400' : 'text-red-900'} hover:underline`}>Confirm</button>
                                                             <span className={isDefault ? 'text-gray-300 dark:text-gray-600' : 'text-black/20'}>/</span>
                                                             <button onClick={() => setIdeas(prev => prev.map(i => i.id === idea.id ? { ...i, isDeleting: false } : i))} className={`${isDefault ? 'text-gray-600 dark:text-gray-400' : 'text-black/60'} hover:underline`}>Cancel</button>

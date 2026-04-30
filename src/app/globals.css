@@ -1,5 +1,3 @@
-@import url('https://fonts.googleapis.com/css2?family=Cascadia+Mono:wght@400;500;600;700&display=swap');
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -18,32 +16,36 @@
   }
 }
 
-/* Universal keyboard focus ring — elements that set their own focus-visible
-   utilities (e.g. focus-visible:ring-*) override this via higher specificity. */
 *:focus-visible {
   outline: 2px solid var(--text-primary);
   outline-offset: 2px;
-  border-radius: 4px;
+  border-radius: 6px;
 }
 
 body {
-  font-family: var(--font-inter), sans-serif;
-  letter-spacing: -0.01em;
+  font-family: -apple-system, BlinkMacSystemFont, var(--font-inter), "SF Pro Text",
+    "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-feature-settings: "cv11", "ss01", "ss03";
+  letter-spacing: -0.005em;
   background-color: var(--bg-primary);
   color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
   transition: background-color 0.2s, color 0.2s;
 }
 
-h1,
-h2,
-h3,
-h4,
-h5,
-h6,
+h1, h2, h3, h4, h5, h6,
 .font-heading,
 .card-title,
 .page-title {
-  font-family: 'Cascadia Mono', monospace;
+  font-family: -apple-system, BlinkMacSystemFont, var(--font-inter), "SF Pro Display",
+    "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-weight: 600;
+  letter-spacing: -0.022em;
+  text-transform: none;
+}
+
+h1, .page-title {
   letter-spacing: -0.03em;
 }
 
@@ -53,31 +55,30 @@ nav,
 .badge,
 .caption,
 .font-ui {
-  font-family: var(--font-inter), sans-serif;
-  letter-spacing: 0.02em;
-}
-
-/* .font-caslon is a legacy class name; it now maps to Onest for the
-   editorial accent role (subtitles, pull-quotes, helper copy). */
-.font-caslon {
-  font-family: var(--font-caslon), 'Helvetica Neue', Helvetica, Arial, sans-serif;
-  font-style: normal;
+  font-family: -apple-system, BlinkMacSystemFont, var(--font-inter), "SF Pro Text",
+    "Helvetica Neue", Helvetica, Arial, sans-serif;
   letter-spacing: -0.005em;
 }
 
-
+.font-caslon {
+  font-family: -apple-system, BlinkMacSystemFont, var(--font-inter), "SF Pro Text",
+    "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-style: normal;
+  font-weight: 400;
+  letter-spacing: -0.005em;
+}
 
 @layer base {
   :root {
-    --bg-primary: #F5F0E8;
-    --bg-panel: #FDFAF4;
-    --bg-panel-strong: #FFFBF2;
-    --border-manila: #D4C9A8;
-    --border-manila-soft: rgba(212, 201, 168, 0.5);
-    --skeleton: #E8E0CC;
-    --text-primary: #111111;
+    --bg-primary: #FAFAFA;
+    --bg-panel: #FFFFFF;
+    --bg-panel-strong: #FFFFFF;
+    --border-manila: rgba(15, 15, 15, 0.08);
+    --border-manila-soft: rgba(15, 15, 15, 0.05);
+    --skeleton: #F0F0F0;
+    --text-primary: #0A0A0A;
 
-    /* Pillar Color Combos (bg, text) */
+    /* Pillar Color Combos (bg, text) — kept intact for accents/folders */
     --combo-1-bg: #630700;
     --combo-1-text: #FF97D0;
     --combo-2-bg: #FF97D0;
@@ -97,58 +98,56 @@ nav,
     --combo-9-bg: #0D5072;
     --combo-9-text: #7FEEFF;
 
-    /* Original shadcn/ui variables to prevent components from breaking entirely */
-    --background: 37 40% 93%;
-    /* HSL approximation of F5F0E8 */
-    --foreground: 0 0% 6.7%;
+    /* shadcn/ui variables */
+    --background: 0 0% 98%;
+    --foreground: 0 0% 4%;
     --card: 0 0% 100%;
-    --card-foreground: 0 0% 6.7%;
+    --card-foreground: 0 0% 4%;
     --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 6.7%;
+    --popover-foreground: 0 0% 4%;
     --primary: 0 0% 9%;
     --primary-foreground: 0 0% 98%;
-    --secondary: 0 0% 96.1%;
+    --secondary: 0 0% 96%;
     --secondary-foreground: 0 0% 9%;
-    --muted: 0 0% 96.1%;
-    --muted-foreground: 0 0% 45.1%;
-    --accent: 0 0% 96.1%;
+    --muted: 0 0% 96%;
+    --muted-foreground: 0 0% 45%;
+    --accent: 0 0% 96%;
     --accent-foreground: 0 0% 9%;
-    --destructive: 0 84.2% 60.2%;
+    --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 89.8%;
-    --input: 0 0% 89.8%;
-    --ring: 0 0% 3.9%;
-    --radius: 0.5rem;
+    --border: 0 0% 92%;
+    --input: 0 0% 92%;
+    --ring: 0 0% 4%;
+    --radius: 0.625rem;
   }
 
   .dark {
-    --bg-primary: #111111;
-    --bg-panel: #1a1a1a;
-    --bg-panel-strong: #222222;
-    --border-manila: #3a3530;
-    --border-manila-soft: rgba(58, 53, 48, 0.6);
-    --skeleton: #2a2620;
-    --text-primary: #F5F0E8;
+    --bg-primary: #0A0A0A;
+    --bg-panel: #141414;
+    --bg-panel-strong: #1A1A1A;
+    --border-manila: rgba(255, 255, 255, 0.08);
+    --border-manila-soft: rgba(255, 255, 255, 0.05);
+    --skeleton: #1F1F1F;
+    --text-primary: #FAFAFA;
 
-    --background: 0 0% 6.7%;
-    --foreground: 37 40% 93%;
-    --card: 0 0% 10.2%;
-    /* #1a1a1a */
-    --card-foreground: 37 40% 93%;
-    --popover: 0 0% 10.2%;
-    --popover-foreground: 37 40% 93%;
+    --background: 0 0% 4%;
+    --foreground: 0 0% 98%;
+    --card: 0 0% 8%;
+    --card-foreground: 0 0% 98%;
+    --popover: 0 0% 8%;
+    --popover-foreground: 0 0% 98%;
     --primary: 0 0% 98%;
     --primary-foreground: 0 0% 9%;
-    --secondary: 0 0% 14.9%;
+    --secondary: 0 0% 14%;
     --secondary-foreground: 0 0% 98%;
-    --muted: 0 0% 14.9%;
-    --muted-foreground: 0 0% 63.9%;
-    --accent: 0 0% 14.9%;
+    --muted: 0 0% 14%;
+    --muted-foreground: 0 0% 64%;
+    --accent: 0 0% 14%;
     --accent-foreground: 0 0% 98%;
-    --destructive: 0 62.8% 30.6%;
+    --destructive: 0 63% 31%;
     --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 14.9%;
-    --input: 0 0% 14.9%;
-    --ring: 0 0% 83.1%;
+    --border: 0 0% 14%;
+    --input: 0 0% 14%;
+    --ring: 0 0% 83%;
   }
 }

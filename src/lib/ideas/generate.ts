@@ -255,7 +255,7 @@ Return ONLY a JSON object with this exact shape:
 { "ideas": [ { ...all fields above... }, ... ] }`;
 }
 
-async function callGroq(groq: Groq, systemMessage: string, userMessage: string): Promise<CandidateIdea[]> {
+async function callGroqOnce(groq: Groq, systemMessage: string, userMessage: string): Promise<CandidateIdea[]> {
     const completion = await groq.chat.completions.create({
         model: 'llama-3.3-70b-versatile',
         messages: [
@@ -273,6 +273,24 @@ async function callGroq(groq: Groq, systemMessage: string, userMessage: string):
     if (parsed && Array.isArray(parsed.ideas)) return parsed.ideas as CandidateIdea[];
     if (parsed && typeof parsed === 'object') return [parsed as CandidateIdea];
     return [];
+}
+
+// Retry once on Groq 429s (TPM exhaustion). The free tier is 12k tokens/minute,
+// and a regenerate-all flow with many pillars can blow that even at concurrency=2.
+// The SDK exposes the retry-after header on the error; we wait it out and retry.
+async function callGroq(groq: Groq, systemMessage: string, userMessage: string): Promise<CandidateIdea[]> {
+    try {
+        return await callGroqOnce(groq, systemMessage, userMessage);
+    } catch (err) {
+        const status = (err as { status?: number })?.status;
+        if (status !== 429) throw err;
+        const headers = (err as { headers?: Record<string, string> })?.headers ?? {};
+        const retryAfterRaw = headers['retry-after'];
+        const retryAfterSec = Math.min(30, Math.max(1, parseInt(retryAfterRaw ?? '15', 10) || 15));
+        console.warn(`ideas/generate Groq 429 — waiting ${retryAfterSec}s and retrying once`);
+        await new Promise(resolve => setTimeout(resolve, retryAfterSec * 1000));
+        return await callGroqOnce(groq, systemMessage, userMessage);
+    }
 }
 
 // -----------------------------------------------------------------------------
@@ -327,6 +345,7 @@ export async function generateIdeasForUser(args: GenerateIdeasArgs): Promise<Gen
         pillarName: string;
         kept: CandidateIdea[];
         rejected: { idea: CandidateIdea; reason: string }[];
+        failed: boolean;
     }> {
         const { data: vpData } = await supabase
             .from('video_pillars')
@@ -370,7 +389,7 @@ export async function generateIdeasForUser(args: GenerateIdeasArgs): Promise<Gen
             candidates = await callGroq(groq, SYSTEM_MESSAGE, userMsg);
         } catch (err) {
             console.error(`ideas/generate pillar="${pillar.name}" Groq failed:`, err);
-            return { pillarId: pillar.id, pillarName: pillar.name, kept: [], rejected: [] };
+            return { pillarId: pillar.id, pillarName: pillar.name, kept: [], rejected: [], failed: true };
         }
         for (const c of candidates) c.pillar = pillar.name;
 
@@ -378,10 +397,29 @@ export async function generateIdeasForUser(args: GenerateIdeasArgs): Promise<Gen
         console.log(
             `ideas/generate pillar="${pillar.name}" candidates=${candidates.length} kept=${kept.length} rejected=${rejected.length}`
         );
-        return { pillarId: pillar.id, pillarName: pillar.name, kept, rejected };
+        return { pillarId: pillar.id, pillarName: pillar.name, kept, rejected, failed: false };
     }
 
-    const pillarResults = await Promise.all(targetPillars.map(p => generateForPillar({ id: p.id, name: p.name })));
+    // Run pillars in batches of 2. Free-tier Groq caps us at 12k tokens/minute,
+    // and each pillar request burns ~1.5–2k tokens (system prompt + voice profile
+    // + transcripts). Two in flight stays comfortably under the ceiling; firing
+    // all of them in parallel — as we used to — bursts past it and silently
+    // drops whichever pillars 429.
+    const PILLAR_CONCURRENCY = 2;
+    const pillarResults: {
+        pillarId: string;
+        pillarName: string;
+        kept: CandidateIdea[];
+        rejected: { idea: CandidateIdea; reason: string }[];
+        failed: boolean;
+    }[] = [];
+    for (let i = 0; i < targetPillars.length; i += PILLAR_CONCURRENCY) {
+        const batch = targetPillars.slice(i, i + PILLAR_CONCURRENCY);
+        const batchResults = await Promise.all(
+            batch.map(p => generateForPillar({ id: p.id, name: p.name }))
+        );
+        pillarResults.push(...batchResults);
+    }
 
     // Each pillar fills its own bucket independently. We deliberately do NOT
     // dedupe across pillars — the same creator's voice produces phrases that
@@ -391,10 +429,15 @@ export async function generateIdeasForUser(args: GenerateIdeasArgs): Promise<Gen
     // inside filterCandidates so each pillar's set is internally distinct.
     const finalIdeas: { pillarId: string; idea: CandidateIdea }[] = [];
     const emptyPillars: string[] = [];
+    const failedPillars: string[] = [];
     for (const r of pillarResults) {
+        if (r.failed) failedPillars.push(r.pillarName);
         const bucket = r.kept.slice(0, perPillarCount);
-        if (bucket.length === 0) emptyPillars.push(r.pillarName);
+        if (!r.failed && bucket.length === 0) emptyPillars.push(r.pillarName);
         for (const idea of bucket) finalIdeas.push({ pillarId: r.pillarId, idea });
+    }
+    if (failedPillars.length > 0) {
+        console.warn(`ideas/generate: pillars failed at the API (Groq error after retry) — ${failedPillars.join(', ')}`);
     }
     if (emptyPillars.length > 0) {
         console.warn(`ideas/generate: pillars produced 0 ideas after filter — ${emptyPillars.join(', ')}`);
@@ -449,7 +492,7 @@ export async function generateIdeasForUser(args: GenerateIdeasArgs): Promise<Gen
     }
 
     console.log(
-        `ideas/generate summary — pillars=${targetPillars.length} per_pillar=${perPillarCount} final=${finalIdeas.length} inserted=${inserted.length} failed=${insertErrors.length} total_rejected=${totalRejected}`
+        `ideas/generate summary — pillars=${targetPillars.length} per_pillar=${perPillarCount} final=${finalIdeas.length} inserted=${inserted.length} insert_failed=${insertErrors.length} api_failed=${failedPillars.length} total_rejected=${totalRejected}`
     );
 
     return {

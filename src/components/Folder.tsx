@@ -36,21 +36,14 @@ export default function Folder({
                     width={w}
                     height={h}
                     preserveAspectRatio="none"
-                    className="drop-shadow-[0_6px_14px_rgba(0,0,0,0.12)]"
+                    className="drop-shadow-[0_4px_12px_rgba(15,15,15,0.08)]"
                     aria-hidden="true"
                 >
-                    <defs>
-                        <linearGradient id={`sheen-${color}`} x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="0%" stopColor="#ffffff" stopOpacity="0.18" />
-                            <stop offset="60%" stopColor="#ffffff" stopOpacity="0" />
-                        </linearGradient>
-                    </defs>
-
                     {/* Back tab — sticks up behind the body */}
                     <path
                         d="M 10 14 Q 10 6 18 6 L 82 6 Q 88 6 91 11 L 96 20 L 10 20 Z"
                         fill={color}
-                        opacity="0.85"
+                        opacity="0.92"
                     />
 
                     {/* Body — main folder rectangle with rounded corners */}
@@ -59,35 +52,24 @@ export default function Folder({
                         y="18"
                         width="208"
                         height="146"
-                        rx="10"
-                        ry="10"
+                        rx="12"
+                        ry="12"
                         fill={color}
-                    />
-
-                    {/* Subtle top-edge highlight */}
-                    <rect
-                        x="6"
-                        y="18"
-                        width="208"
-                        height="146"
-                        rx="10"
-                        ry="10"
-                        fill={`url(#sheen-${color})`}
                     />
 
                     {/* Monogram */}
                     {monogram && (
                         <text
                             x="50%"
-                            y="58%"
+                            y="60%"
                             textAnchor="middle"
                             dominantBaseline="middle"
-                            fontFamily="'Cormorant Garamond', 'Adobe Caslon Pro', Georgia, serif"
-                            fontStyle="italic"
-                            fontWeight="500"
-                            fontSize={size === 'sm' ? 44 : size === 'lg' ? 96 : 72}
+                            fontFamily="-apple-system, BlinkMacSystemFont, 'SF Pro Display', Inter, sans-serif"
+                            fontWeight="600"
+                            fontSize={size === 'sm' ? 38 : size === 'lg' ? 80 : 60}
+                            letterSpacing="-0.02em"
                             fill={textColor}
-                            opacity="0.9"
+                            opacity="0.85"
                         >
                             {monogram}
                         </text>
@@ -99,14 +81,14 @@ export default function Folder({
                 <div className="flex flex-col items-start gap-0.5 pl-1">
                     {label && (
                         <span
-                            className="font-caslon italic text-sm md:text-base leading-tight"
+                            className="text-sm md:text-base font-semibold tracking-tight leading-tight"
                             style={{ color: 'var(--text-primary)' }}
                         >
                             {label}
                         </span>
                     )}
                     {caption && (
-                        <span className="font-ui text-[9px] uppercase tracking-[0.18em] text-[var(--muted-foreground)]">
+                        <span className="text-xs text-[var(--muted-foreground)]">
                             {caption}
                         </span>
                     )}

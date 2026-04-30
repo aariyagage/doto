@@ -1,41 +1,52 @@
 import Link from 'next/link'
 import { ArrowUpRight } from 'lucide-react'
 import Folder from '@/components/Folder'
-import { PILLAR_COLORS } from '@/lib/colors'
 
-const WORKSPACE_FOLDERS: {
-    label: string
-    caption: string
-    monogram: string
-    colorIdx: number
-    tilt: number
-}[] = [
-    { label: 'Videos',      caption: 'Raw material',         monogram: 'V', colorIdx: 0, tilt: -2 },
-    { label: 'Transcripts', caption: 'What you said',        monogram: 'T', colorIdx: 2, tilt: 1.5 },
-    { label: 'Pillars',     caption: 'Recurring themes',     monogram: 'P', colorIdx: 3, tilt: -1 },
-    { label: 'Ideas',       caption: 'Next, automatically',  monogram: 'I', colorIdx: 6, tilt: 2 },
-    { label: 'Voice',       caption: 'Your signature DNA',   monogram: 'V', colorIdx: 8, tilt: -1.5 },
-    { label: 'Library',     caption: 'Everything, sorted',   monogram: 'L', colorIdx: 5, tilt: 1 },
+const WORKSPACE_FOLDERS: { label: string; caption: string; index: string }[] = [
+    { label: 'Videos',      caption: 'Raw material',         index: '01' },
+    { label: 'Transcripts', caption: 'What you said',        index: '02' },
+    { label: 'Pillars',     caption: 'Recurring themes',     index: '03' },
+    { label: 'Ideas',       caption: 'Next, automatically',  index: '04' },
+    { label: 'Voice',       caption: 'Your signature DNA',   index: '05' },
+    { label: 'Library',     caption: 'Everything, sorted',   index: '06' },
+]
+
+const STEPS = [
+    {
+        n: '01',
+        title: 'Upload raw footage',
+        body: 'Drop in a video or a batch. We run transcription, chunk it, and save it to your transcripts folder.',
+    },
+    {
+        n: '02',
+        title: 'Pillars surface',
+        body: 'As your library grows, recurring themes get promoted to named pillars — the subjects you actually talk about.',
+    },
+    {
+        n: '03',
+        title: 'Ideas, in your voice',
+        body: 'Pull fresh ideas tuned to your pillars, hooks you would actually open with, structures you would actually use.',
+    },
 ]
 
 export default function Home() {
     return (
-        <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
+        <div className="min-h-screen bg-paper text-ink">
             {/* Nav */}
-            <nav className="w-full px-6 md:px-12 py-5 flex justify-between items-center max-w-7xl mx-auto">
-                <Link href="/" className="text-2xl font-semibold tracking-tight leading-none">
+            <nav className="w-full max-w-6xl mx-auto px-6 md:px-10 py-6 flex items-center justify-between">
+                <Link href="/" className="font-serif text-2xl leading-none tracking-tight">
                     doto
                 </Link>
-                <div className="flex gap-2 items-center">
+                <div className="flex items-center gap-1">
                     <Link
                         href="/login"
-                        className="px-4 py-2 rounded-full text-sm font-medium text-[var(--text-primary)]/70 hover:text-[var(--text-primary)] hover:bg-[var(--text-primary)]/[0.04] transition-colors"
+                        className="px-4 py-2 text-body-sm text-ink-muted hover:text-ink transition-colors"
                     >
                         Log in
                     </Link>
                     <Link
                         href="/signup"
-                        className="px-4 py-2 rounded-full bg-[var(--text-primary)] text-[var(--bg-primary)] text-sm font-medium hover:opacity-90 transition-opacity"
+                        className="ml-2 px-5 py-2 rounded-full bg-ink text-paper text-body-sm font-medium hover:bg-ink/90 transition-colors"
                     >
                         Get started
                     </Link>
@@ -43,99 +54,75 @@ export default function Home() {
             </nav>
 
             {/* Hero */}
-            <section className="max-w-6xl mx-auto px-6 md:px-12 pt-12 pb-16 md:pt-24 md:pb-24 text-center">
-                <div className="text-xs uppercase tracking-[0.16em] text-[var(--muted-foreground)] mb-6 font-medium">
+            <section className="max-w-5xl mx-auto px-6 md:px-10 pt-16 pb-20 md:pt-28 md:pb-28">
+                <div className="text-caption text-ink-muted mb-8">
                     A creator&rsquo;s content workspace
                 </div>
-                <h1 className="text-5xl md:text-7xl lg:text-[80px] font-semibold leading-[1.02] tracking-[-0.035em] max-w-4xl mx-auto">
-                    Your brain,{' '}
-                    <span className="text-[var(--combo-3-bg)]">organized</span>
-                    <br />
-                    into content.
+                <h1 className="font-serif text-display-1 text-ink text-balance">
+                    Your brain, organized <em className="italic font-normal">into content.</em>
                 </h1>
-                <p className="mt-7 text-lg md:text-xl leading-relaxed text-[var(--text-primary)]/65 max-w-2xl mx-auto">
+                <p className="mt-8 text-body-lg text-ink-muted max-w-2xl text-pretty">
                     Upload your videos. We transcribe them, surface your content pillars, and draft new ideas in your exact voice — filed and ready when you need them.
                 </p>
-                <div className="mt-9 flex items-center justify-center gap-4">
+                <div className="mt-10 flex flex-wrap items-center gap-x-5 gap-y-3">
                     <Link
                         href="/signup"
-                        className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-[var(--text-primary)] text-[var(--bg-primary)] font-medium text-base hover:opacity-90 transition-opacity"
+                        className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-ink text-paper text-body font-medium hover:bg-ink/90 transition-colors"
                     >
                         Open your workspace
-                        <ArrowUpRight className="w-4 h-4" />
+                        <ArrowUpRight className="w-4 h-4" strokeWidth={1.75} />
                     </Link>
-                    <span className="text-sm text-[var(--muted-foreground)]">
-                        No credit card.
+                    <span className="text-body-sm text-ink-faint">
+                        No credit card required.
                     </span>
                 </div>
             </section>
 
             {/* Workspace shelf */}
-            <section className="max-w-7xl mx-auto px-6 md:px-12 pb-20 md:pb-32">
-                <div className="flex items-baseline justify-between mb-10 md:mb-14 pb-4 border-b border-[var(--border-manila)]">
-                    <h2 className="text-2xl md:text-3xl font-semibold tracking-tight">
+            <section className="max-w-6xl mx-auto px-6 md:px-10 pb-24 md:pb-32">
+                <header className="flex items-baseline justify-between pb-6 mb-12 md:mb-16 border-b border-rule">
+                    <h2 className="font-serif text-display-3 text-ink">
                         The workspace
                     </h2>
-                    <span className="text-sm text-[var(--muted-foreground)]">
-                        Six folders. One filing system.
+                    <span className="text-caption text-ink-muted">
+                        Six folders · One filing system
                     </span>
-                </div>
+                </header>
 
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-10 md:gap-x-10 md:gap-y-14 justify-items-start">
-                    {WORKSPACE_FOLDERS.map((f) => {
-                        const combo = PILLAR_COLORS[f.colorIdx]
-                        return (
-                            <Folder
-                                key={f.label}
-                                color={combo.bg}
-                                label={f.label}
-                                caption={f.caption}
-                                monogram={f.monogram}
-                                tilt={f.tilt}
-                                size="md"
-                            />
-                        )
-                    })}
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-x-8 gap-y-12 md:gap-x-12 md:gap-y-16 justify-items-start">
+                    {WORKSPACE_FOLDERS.map(f => (
+                        <Folder
+                            key={f.label}
+                            label={f.label}
+                            caption={f.caption}
+                            index={f.index}
+                            size="md"
+                        />
+                    ))}
                 </div>
             </section>
 
             {/* How it works */}
-            <section className="max-w-7xl mx-auto px-6 md:px-12 pb-24 md:pb-32">
-                <div className="flex items-baseline justify-between mb-10 md:mb-14 pb-4 border-b border-[var(--border-manila)]">
-                    <h2 className="text-2xl md:text-3xl font-semibold tracking-tight">
+            <section className="max-w-6xl mx-auto px-6 md:px-10 pb-24 md:pb-32">
+                <header className="flex items-baseline justify-between pb-6 mb-12 md:mb-16 border-b border-rule">
+                    <h2 className="font-serif text-display-3 text-ink">
                         How it files itself
                     </h2>
-                    <span className="text-sm text-[var(--muted-foreground)]">
+                    <span className="text-caption text-ink-muted">
                         Three steps
                     </span>
-                </div>
+                </header>
 
-                <ol className="grid grid-cols-1 md:grid-cols-3 gap-8 md:gap-12">
-                    {[
-                        {
-                            n: '01',
-                            title: 'Upload raw footage',
-                            body: 'Drop in a video or a batch. We run transcription, chunk it, and save it to your transcripts folder.',
-                        },
-                        {
-                            n: '02',
-                            title: 'Pillars surface',
-                            body: 'As your library grows, recurring themes get promoted to named pillars — the subjects you actually talk about.',
-                        },
-                        {
-                            n: '03',
-                            title: 'Ideas, in your voice',
-                            body: 'Pull fresh ideas tuned to your pillars, hooks you would actually open with, structures you would actually use.',
-                        },
-                    ].map((step) => (
+                <ol className="grid grid-cols-1 md:grid-cols-3 gap-10 md:gap-12">
+                    {STEPS.map(step => (
                         <li key={step.n} className="flex flex-col gap-3">
-                            <span className="text-xs uppercase tracking-[0.16em] text-[var(--muted-foreground)] font-medium">
-                                Step {step.n}
+                            <span className="font-serif italic text-ink-faint text-2xl leading-none">
+                                {step.n}
                             </span>
-                            <h3 className="text-xl md:text-2xl font-semibold tracking-tight leading-snug">
+                            <h3 className="text-title-2 text-ink mt-2">
                                 {step.title}
                             </h3>
-                            <p className="text-base leading-relaxed text-[var(--text-primary)]/70">
+                            <p className="text-body text-ink-muted text-pretty">
                                 {step.body}
                             </p>
                         </li>
@@ -143,32 +130,32 @@ export default function Home() {
                 </ol>
             </section>
 
-            {/* Closing CTA band */}
-            <section className="max-w-7xl mx-auto px-6 md:px-12 pb-20 md:pb-28">
-                <div className="border-t border-[var(--border-manila)] pt-10 md:pt-14 flex flex-col md:flex-row items-start md:items-end justify-between gap-6">
+            {/* Closing CTA */}
+            <section className="max-w-6xl mx-auto px-6 md:px-10 pb-24 md:pb-32">
+                <div className="border-t border-rule pt-12 md:pt-16 flex flex-col md:flex-row md:items-end md:justify-between gap-8">
                     <div>
-                        <h2 className="text-3xl md:text-5xl font-semibold tracking-[-0.03em] leading-[1.05]">
+                        <h2 className="font-serif text-display-2 text-ink leading-[1.02]">
                             Stop starting<br />
-                            from scratch.
+                            <em className="italic font-normal">from scratch.</em>
                         </h2>
-                        <p className="mt-4 text-lg text-[var(--text-primary)]/65 max-w-md">
+                        <p className="mt-5 text-body-lg text-ink-muted max-w-md">
                             Your workspace is already full of material. doto files it for you.
                         </p>
                     </div>
                     <Link
                         href="/signup"
-                        className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-[var(--text-primary)] text-[var(--bg-primary)] font-medium text-base hover:opacity-90 transition-opacity whitespace-nowrap"
+                        className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-ink text-paper text-body font-medium hover:bg-ink/90 transition-colors whitespace-nowrap self-start md:self-auto"
                     >
                         Start filing
-                        <ArrowUpRight className="w-4 h-4" />
+                        <ArrowUpRight className="w-4 h-4" strokeWidth={1.75} />
                     </Link>
                 </div>
             </section>
 
             {/* Footer */}
-            <footer className="max-w-7xl mx-auto px-6 md:px-12 pb-10 border-t border-[var(--border-manila)] pt-6 flex items-center justify-between">
-                <span className="text-base font-semibold tracking-tight">doto</span>
-                <span className="text-xs text-[var(--muted-foreground)]">
+            <footer className="max-w-6xl mx-auto px-6 md:px-10 pb-10 pt-8 border-t border-rule flex items-center justify-between">
+                <span className="font-serif text-lg leading-none">doto</span>
+                <span className="text-caption text-ink-faint">
                     &copy; {new Date().getFullYear()}
                 </span>
             </footer>

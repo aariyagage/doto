@@ -1,12 +1,12 @@
 import { getPairedTextColor } from '@/lib/colors'
 
 interface FolderProps {
-    color: string
     label?: string
     caption?: string
-    monogram?: string
+    index?: string          // editorial corner mark — numeral or letter
+    color?: string          // optional bg override; defaults to manila
+    inkColor?: string       // optional ink override; auto-paired if color given
     size?: 'sm' | 'md' | 'lg'
-    tilt?: number
     className?: string
 }
 
@@ -16,79 +16,85 @@ const SIZE_PX = {
     lg: { w: 280, h: 216 },
 } as const
 
+/**
+ * Editorial folder. Single restrained manila by default with a small corner
+ * numeral instead of a giant monogram. No tilt, no drop-shadow gimmicks —
+ * just a quiet typographic object that fits an editorial layout.
+ *
+ * Pass `color` to override the default manila (e.g., for pillar tagging UI
+ * where each pillar carries its own DB-saved color).
+ */
 export default function Folder({
-    color,
     label,
     caption,
-    monogram,
+    index,
+    color,
+    inkColor,
     size = 'md',
-    tilt = 0,
     className = '',
 }: FolderProps) {
     const { w, h } = SIZE_PX[size]
-    const textColor = getPairedTextColor(color)
+    const fill = color ?? 'var(--manila)'
+    const ink = inkColor ?? (color ? getPairedTextColor(color) : 'var(--manila-ink)')
 
     return (
-        <div className={`inline-flex flex-col items-start gap-3 ${className}`} style={{ transform: tilt ? `rotate(${tilt}deg)` : undefined }}>
+        <div className={`inline-flex flex-col items-start gap-3 ${className}`}>
             <div className="relative" style={{ width: w, height: h }}>
                 <svg
                     viewBox="0 0 220 170"
                     width={w}
                     height={h}
                     preserveAspectRatio="none"
-                    className="drop-shadow-[0_4px_12px_rgba(15,15,15,0.08)]"
                     aria-hidden="true"
                 >
-                    {/* Back tab — sticks up behind the body */}
+                    {/* Back tab */}
                     <path
                         d="M 10 14 Q 10 6 18 6 L 82 6 Q 88 6 91 11 L 96 20 L 10 20 Z"
-                        fill={color}
+                        fill={fill}
                         opacity="0.92"
                     />
 
-                    {/* Body — main folder rectangle with rounded corners */}
+                    {/* Body */}
                     <rect
                         x="6"
                         y="18"
                         width="208"
                         height="146"
-                        rx="12"
-                        ry="12"
-                        fill={color}
+                        rx="6"
+                        ry="6"
+                        fill={fill}
                     />
 
-                    {/* Monogram */}
-                    {monogram && (
+                    {/* Corner numeral — editorial, not a kindergarten letter */}
+                    {index && (
                         <text
-                            x="50%"
-                            y="60%"
-                            textAnchor="middle"
+                            x="22"
+                            y="48"
+                            textAnchor="start"
                             dominantBaseline="middle"
-                            fontFamily="-apple-system, BlinkMacSystemFont, 'SF Pro Display', Inter, sans-serif"
-                            fontWeight="600"
-                            fontSize={size === 'sm' ? 38 : size === 'lg' ? 80 : 60}
-                            letterSpacing="-0.02em"
-                            fill={textColor}
-                            opacity="0.85"
+                            fontFamily="var(--font-instrument-serif), Baskerville, serif"
+                            fontWeight="400"
+                            fontSize={size === 'sm' ? 16 : size === 'lg' ? 24 : 20}
+                            letterSpacing="0"
+                            fill={ink}
+                            opacity="0.55"
+                            fontStyle="italic"
                         >
-                            {monogram}
+                            {index}
                         </text>
                     )}
                 </svg>
             </div>
 
             {(label || caption) && (
-                <div className="flex flex-col items-start gap-0.5 pl-1">
+                <div className="flex flex-col items-start gap-1">
                     {label && (
-                        <span
-                            className="text-sm md:text-base font-semibold tracking-tight leading-tight"
-                            style={{ color: 'var(--text-primary)' }}
-                        >
+                        <span className="text-title-3 text-ink leading-none">
                             {label}
                         </span>
                     )}
                     {caption && (
-                        <span className="text-xs text-[var(--muted-foreground)]">
+                        <span className="text-body-sm text-ink-muted">
                             {caption}
                         </span>
                     )}

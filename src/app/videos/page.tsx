@@ -151,7 +151,7 @@ export default function VideoLibraryPage() {
 
                             {!isLoading && transcripts.length === 0 && (
                                 <div className="col-span-full flex flex-col items-center justify-center py-16 md:py-24 text-center">
-                                    <Folder color="var(--combo-3-bg)" size="sm" tilt={-3} />
+                                    <Folder color="var(--combo-3-bg)" size="sm" />
                                     <h3 className="text-xl font-semibold tracking-tight text-[var(--text-primary)] mt-6 mb-2">An empty shelf</h3>
                                     <p className="text-base text-[var(--text-primary)]/60 mb-6 max-w-sm">
                                         Upload a video to start filling your library. We&rsquo;ll transcribe it, tag it to a pillar, and file it here.
@@ -173,7 +173,7 @@ export default function VideoLibraryPage() {
                                         <div className="w-full flex items-end justify-center pt-6 pb-3 px-5 bg-[var(--text-primary)]/[0.02] border-b border-[var(--border-manila)] rounded-t-2xl">
                                             <Folder
                                                 color={mainColor}
-                                                monogram={(transcript.videos?.file_name || 'V').trim().charAt(0).toUpperCase()}
+                                                index={(transcript.videos?.file_name || 'V').trim().charAt(0).toUpperCase()}
                                                 size="sm"
                                             />
                                         </div>

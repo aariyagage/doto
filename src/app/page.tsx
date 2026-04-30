@@ -1,33 +1,8 @@
 import Link from 'next/link'
 import { ArrowUpRight } from 'lucide-react'
-import Folder from '@/components/Folder'
-
-const WORKSPACE_FOLDERS: { label: string; caption: string; index: string }[] = [
-    { label: 'Videos',      caption: 'Raw material',         index: '01' },
-    { label: 'Transcripts', caption: 'What you said',        index: '02' },
-    { label: 'Pillars',     caption: 'Recurring themes',     index: '03' },
-    { label: 'Ideas',       caption: 'Next, automatically',  index: '04' },
-    { label: 'Voice',       caption: 'Your signature DNA',   index: '05' },
-    { label: 'Library',     caption: 'Everything, sorted',   index: '06' },
-]
-
-const STEPS = [
-    {
-        n: '01',
-        title: 'Upload raw footage',
-        body: 'Drop in a video or a batch. We run transcription, chunk it, and save it to your transcripts folder.',
-    },
-    {
-        n: '02',
-        title: 'Pillars surface',
-        body: 'As your library grows, recurring themes get promoted to named pillars — the subjects you actually talk about.',
-    },
-    {
-        n: '03',
-        title: 'Ideas, in your voice',
-        body: 'Pull fresh ideas tuned to your pillars, hooks you would actually open with, structures you would actually use.',
-    },
-]
+import WorkspaceShelf from '@/components/landing/WorkspaceShelf'
+import Bento from '@/components/landing/Bento'
+import SpecsStrip from '@/components/landing/SpecsStrip'
 
 export default function Home() {
     return (
@@ -78,57 +53,14 @@ export default function Home() {
                 </div>
             </section>
 
-            {/* Workspace shelf */}
-            <section className="max-w-6xl mx-auto px-6 md:px-10 pb-24 md:pb-32">
-                <header className="flex items-baseline justify-between pb-6 mb-12 md:mb-16 border-b border-rule">
-                    <h2 className="text-display-3 text-ink">
-                        The workspace
-                    </h2>
-                    <span className="text-caption text-ink-muted">
-                        Six folders · One filing system
-                    </span>
-                </header>
+            {/* Workspace shelf — animated stagger */}
+            <WorkspaceShelf />
 
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-x-8 gap-y-12 md:gap-x-12 md:gap-y-16 justify-items-start">
-                    {WORKSPACE_FOLDERS.map(f => (
-                        <Folder
-                            key={f.label}
-                            label={f.label}
-                            caption={f.caption}
-                            index={f.index}
-                            size="md"
-                        />
-                    ))}
-                </div>
-            </section>
+            {/* Bento — capabilities */}
+            <Bento />
 
-            {/* How it works */}
-            <section className="max-w-6xl mx-auto px-6 md:px-10 pb-24 md:pb-32">
-                <header className="flex items-baseline justify-between pb-6 mb-12 md:mb-16 border-b border-rule">
-                    <h2 className="text-display-3 text-ink">
-                        How it files itself
-                    </h2>
-                    <span className="text-caption text-ink-muted">
-                        Three steps
-                    </span>
-                </header>
-
-                <ol className="grid grid-cols-1 md:grid-cols-3 gap-10 md:gap-12">
-                    {STEPS.map(step => (
-                        <li key={step.n} className="flex flex-col gap-3">
-                            <span className="text-4xl font-light tabular-nums text-ink-faint leading-none tracking-tight">
-                                {step.n}
-                            </span>
-                            <h3 className="text-title-2 text-ink mt-2">
-                                {step.title}
-                            </h3>
-                            <p className="text-body text-ink-muted text-pretty">
-                                {step.body}
-                            </p>
-                        </li>
-                    ))}
-                </ol>
-            </section>
+            {/* Specs strip — honest claims */}
+            <SpecsStrip />
 
             {/* Closing CTA */}
             <section className="max-w-6xl mx-auto px-6 md:px-10 pb-24 md:pb-32">

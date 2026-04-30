@@ -10,7 +10,19 @@ const config: Config = {
   theme: {
     extend: {
       fontFamily: {
-        sans: ["var(--font-inter)", "ui-sans-serif", "system-ui", "sans-serif"],
+        // System-first sans — SF Pro on macOS, Segoe UI on Windows, Inter as
+        // webfont fallback. Matches body/heading rules in globals.css.
+        sans: [
+          "-apple-system",
+          "BlinkMacSystemFont",
+          "Segoe UI Variable Text",
+          "Segoe UI",
+          "var(--font-inter)",
+          "Helvetica Neue",
+          "Helvetica",
+          "Arial",
+          "sans-serif",
+        ],
         serif: [
           "var(--font-instrument-serif)",
           "Iowan Old Style",

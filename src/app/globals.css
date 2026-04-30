@@ -148,10 +148,19 @@
    Typography
    ============================================================= */
 
+/*
+ * Body type — prefer the OS native UI font (SF Pro on macOS, Segoe UI Variable
+ * on Windows). Inter is the webfont fallback for platforms without a strong
+ * default. This is the same approach Notion / GitHub / Vercel use, and it's
+ * what gives apps that "native productive" feel on Mac — SF Pro is optically
+ * tuned for UI in a way Inter isn't.
+ */
 body {
-  font-family: var(--font-inter), -apple-system, BlinkMacSystemFont,
-    "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif;
-  font-feature-settings: "cv11", "ss01", "ss03";
+  font-family:
+    -apple-system, BlinkMacSystemFont,
+    "Segoe UI Variable Text", "Segoe UI",
+    var(--font-inter),
+    "Helvetica Neue", Helvetica, Arial, sans-serif;
   font-size: var(--body);
   line-height: 1.6;
   letter-spacing: -0.005em;
@@ -205,10 +214,15 @@ body {
   text-transform: uppercase;
 }
 
-/* Default heading typography — sans, but generous tracking. Pages can override
-   with .text-display-* to escalate to editorial serif. */
+/* Default heading typography — also system-first. SF Pro Display kicks in
+   automatically at large sizes on macOS via -apple-system. Pages can escalate
+   to editorial serif via .text-display-* classes. */
 h1, h2, h3, h4, h5, h6 {
-  font-family: var(--font-inter), -apple-system, BlinkMacSystemFont, sans-serif;
+  font-family:
+    -apple-system, BlinkMacSystemFont,
+    "Segoe UI Variable Display", "Segoe UI",
+    var(--font-inter),
+    sans-serif;
   font-weight: 600;
   letter-spacing: -0.018em;
   text-transform: none;
@@ -216,14 +230,25 @@ h1, h2, h3, h4, h5, h6 {
 
 h1 { letter-spacing: -0.025em; }
 
-/* Legacy compatibility — old code referenced these classes. Map onto the
-   sans-default heading style so nothing visually breaks before we migrate. */
+.text-title-1, .text-title-2, .text-title-3 {
+  font-family:
+    -apple-system, BlinkMacSystemFont,
+    "Segoe UI Variable Display", "Segoe UI",
+    var(--font-inter),
+    sans-serif;
+}
+
+/* Legacy compatibility — old code referenced these classes. */
 .font-heading,
 .card-title,
 .page-title,
 .ui-label,
 .font-ui {
-  font-family: var(--font-inter), sans-serif;
+  font-family:
+    -apple-system, BlinkMacSystemFont,
+    "Segoe UI Variable Text", "Segoe UI",
+    var(--font-inter),
+    sans-serif;
   letter-spacing: -0.005em;
 }
 

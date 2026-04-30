@@ -171,21 +171,24 @@ body {
   transition: background-color 0.2s, color 0.2s;
 }
 
-/* Editorial display — Instrument Serif. Use intentionally, not on every heading. */
-.font-serif-display,
+/* Display headlines — system-first sans, tightened for large sizes.
+ * On macOS, -apple-system automatically engages SF Pro Display (vs SF Pro Text)
+ * above ~19pt, which is optically tuned for headline use. We tighten tracking
+ * to match Apple's own marketing rhythm. */
 .text-display-1,
 .text-display-2,
 .text-display-3 {
-  font-family: var(--font-instrument-serif), "Iowan Old Style", "Apple Garamond",
-    Baskerville, "Times New Roman", serif;
-  font-weight: 400;
-  font-style: normal;
-  letter-spacing: -0.018em;
+  font-family:
+    -apple-system, BlinkMacSystemFont,
+    "Segoe UI Variable Display", "Segoe UI",
+    var(--font-inter),
+    sans-serif;
+  font-weight: 600;
 }
 
-.text-display-1 { font-size: var(--display-1); line-height: 0.96; letter-spacing: -0.025em; }
-.text-display-2 { font-size: var(--display-2); line-height: 1.02; letter-spacing: -0.022em; }
-.text-display-3 { font-size: var(--display-3); line-height: 1.08; letter-spacing: -0.02em; }
+.text-display-1 { font-size: var(--display-1); line-height: 0.96; letter-spacing: -0.04em; }
+.text-display-2 { font-size: var(--display-2); line-height: 1.0; letter-spacing: -0.035em; }
+.text-display-3 { font-size: var(--display-3); line-height: 1.08; letter-spacing: -0.028em; }
 
 /* UI titles — Inter. Tight, modern. */
 .text-title-1 {
@@ -252,12 +255,14 @@ h1 { letter-spacing: -0.025em; }
   letter-spacing: -0.005em;
 }
 
-/* `.font-caslon` historically existed. It now actually is serif. */
+/* `.font-caslon` is a legacy class — used to point at a serif but is now a
+ * no-op alias for the system sans. Kept so old call sites don't break. */
 .font-caslon {
-  font-family: var(--font-instrument-serif), "Iowan Old Style", "Apple Garamond",
-    Baskerville, "Times New Roman", serif;
-  font-style: normal;
-  font-weight: 400;
+  font-family:
+    -apple-system, BlinkMacSystemFont,
+    "Segoe UI Variable Text", "Segoe UI",
+    var(--font-inter),
+    sans-serif;
   letter-spacing: -0.005em;
 }
 

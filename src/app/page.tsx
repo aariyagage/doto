@@ -34,7 +34,7 @@ export default function Home() {
         <div className="min-h-screen bg-paper text-ink">
             {/* Nav */}
             <nav className="w-full max-w-6xl mx-auto px-6 md:px-10 py-6 flex items-center justify-between">
-                <Link href="/" className="font-serif text-2xl leading-none tracking-tight">
+                <Link href="/" className="text-xl font-semibold tracking-tight leading-none">
                     doto
                 </Link>
                 <div className="flex items-center gap-1">
@@ -58,8 +58,8 @@ export default function Home() {
                 <div className="text-caption text-ink-muted mb-8">
                     A creator&rsquo;s content workspace
                 </div>
-                <h1 className="font-serif text-display-1 text-ink text-balance">
-                    Your brain, organized <em className="italic font-normal">into content.</em>
+                <h1 className="text-display-1 text-ink text-balance">
+                    Your brain, organized into content.
                 </h1>
                 <p className="mt-8 text-body-lg text-ink-muted max-w-2xl text-pretty">
                     Upload your videos. We transcribe them, surface your content pillars, and draft new ideas in your exact voice — filed and ready when you need them.
@@ -81,7 +81,7 @@ export default function Home() {
             {/* Workspace shelf */}
             <section className="max-w-6xl mx-auto px-6 md:px-10 pb-24 md:pb-32">
                 <header className="flex items-baseline justify-between pb-6 mb-12 md:mb-16 border-b border-rule">
-                    <h2 className="font-serif text-display-3 text-ink">
+                    <h2 className="text-display-3 text-ink">
                         The workspace
                     </h2>
                     <span className="text-caption text-ink-muted">
@@ -105,7 +105,7 @@ export default function Home() {
             {/* How it works */}
             <section className="max-w-6xl mx-auto px-6 md:px-10 pb-24 md:pb-32">
                 <header className="flex items-baseline justify-between pb-6 mb-12 md:mb-16 border-b border-rule">
-                    <h2 className="font-serif text-display-3 text-ink">
+                    <h2 className="text-display-3 text-ink">
                         How it files itself
                     </h2>
                     <span className="text-caption text-ink-muted">
@@ -116,7 +116,7 @@ export default function Home() {
                 <ol className="grid grid-cols-1 md:grid-cols-3 gap-10 md:gap-12">
                     {STEPS.map(step => (
                         <li key={step.n} className="flex flex-col gap-3">
-                            <span className="font-serif italic text-ink-faint text-2xl leading-none">
+                            <span className="text-4xl font-light tabular-nums text-ink-faint leading-none tracking-tight">
                                 {step.n}
                             </span>
                             <h3 className="text-title-2 text-ink mt-2">
@@ -134,9 +134,9 @@ export default function Home() {
             <section className="max-w-6xl mx-auto px-6 md:px-10 pb-24 md:pb-32">
                 <div className="border-t border-rule pt-12 md:pt-16 flex flex-col md:flex-row md:items-end md:justify-between gap-8">
                     <div>
-                        <h2 className="font-serif text-display-2 text-ink leading-[1.02]">
+                        <h2 className="text-display-2 text-ink">
                             Stop starting<br />
-                            <em className="italic font-normal">from scratch.</em>
+                            from scratch.
                         </h2>
                         <p className="mt-5 text-body-lg text-ink-muted max-w-md">
                             Your workspace is already full of material. doto files it for you.
@@ -154,7 +154,7 @@ export default function Home() {
 
             {/* Footer */}
             <footer className="max-w-6xl mx-auto px-6 md:px-10 pb-10 pt-8 border-t border-rule flex items-center justify-between">
-                <span className="font-serif text-lg leading-none">doto</span>
+                <span className="text-base font-semibold tracking-tight">doto</span>
                 <span className="text-caption text-ink-faint">
                     &copy; {new Date().getFullYear()}
                 </span>

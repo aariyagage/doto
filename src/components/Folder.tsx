@@ -65,20 +65,20 @@ export default function Folder({
                         fill={fill}
                     />
 
-                    {/* Corner numeral — editorial, not a kindergarten letter */}
+                    {/* Corner numeral — system sans, light, tabular. */}
                     {index && (
                         <text
                             x="22"
                             y="48"
                             textAnchor="start"
                             dominantBaseline="middle"
-                            fontFamily="var(--font-instrument-serif), Baskerville, serif"
+                            fontFamily="-apple-system, BlinkMacSystemFont, 'Segoe UI Variable Display', 'Segoe UI', Inter, sans-serif"
                             fontWeight="400"
-                            fontSize={size === 'sm' ? 16 : size === 'lg' ? 24 : 20}
-                            letterSpacing="0"
+                            fontSize={size === 'sm' ? 14 : size === 'lg' ? 20 : 17}
+                            letterSpacing="-0.02em"
                             fill={ink}
                             opacity="0.55"
-                            fontStyle="italic"
+                            style={{ fontVariantNumeric: 'tabular-nums' }}
                         >
                             {index}
                         </text>

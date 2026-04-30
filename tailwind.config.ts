@@ -23,14 +23,6 @@ const config: Config = {
           "Arial",
           "sans-serif",
         ],
-        serif: [
-          "var(--font-instrument-serif)",
-          "Iowan Old Style",
-          "Apple Garamond",
-          "Baskerville",
-          "Times New Roman",
-          "serif",
-        ],
       },
       colors: {
         // Editorial palette — preferred for new code

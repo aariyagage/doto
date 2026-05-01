@@ -191,55 +191,82 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
     }, [tasks, processTask])
 
     // Enrich completed tasks with transcript + pillars (display-only data).
+    // Enrichment runs in a SEQUENTIAL queue keyed by task id. Earlier we ran
+    // a `.forEach(async ...)` over every done task on every render — each one
+    // called supabase.auth.getUser(), which contends for the gotrue lock. With
+    // 5+ tasks, the lock thrashed: half the calls aborted with "Lock broken
+    // by another request with the 'steal' option" and the affected tasks
+    // never got their pillars/transcript displayed (DB had them, UI didn't).
+    //
+    // Fix: one shared `getUser` call per render pass, and a per-task in-flight
+    // guard so the same task isn't enriched twice in parallel even when the
+    // effect re-fires before the previous run finished.
+    //
     // Note the `pillars !== undefined` guard (vs truthy check): we explicitly
-    // reset pillars to undefined elsewhere when a later upload's bootstrap may
-    // have retroactively tagged this video, and that reset is what triggers a
-    // re-fetch. An empty array (`[]`) is treated as "fetched, none yet" and
-    // keeps the effect from looping.
+    // reset pillars to undefined elsewhere when a later upload may have
+    // retroactively affected this video. An empty array (`[]`) is treated as
+    // "fetched, none yet" and keeps the effect from looping.
+    const enrichInFlightRef = useRef<Set<string>>(new Set())
     useEffect(() => {
-        tasks.forEach(async (task) => {
-            if (task.status !== 'done' || !task.videoId) return
-            if (task.transcript && task.pillars !== undefined) return
-            if (task.errorMessage) return
+        const candidates = tasks.filter(t =>
+            t.status === 'done' &&
+            t.videoId &&
+            !t.errorMessage &&
+            !(t.transcript && t.pillars !== undefined) &&
+            !enrichInFlightRef.current.has(t.id),
+        )
+        if (candidates.length === 0) return
 
-            try {
-                const { data: { user } } = await supabase.auth.getUser()
-                if (!user) return
+        let cancelled = false
+        ;(async () => {
+            // Single auth call for the whole batch — no lock contention.
+            const { data: { user } } = await supabase.auth.getUser()
+            if (!user || cancelled) return
 
-                const { data: tsData, error: tsErr } = await supabase
-                    .from('transcripts')
-                    .select('raw_text, word_count')
-                    .eq('video_id', task.videoId)
-                    .eq('user_id', user.id)
-                    .single()
-
-                const { data: vpData } = await supabase
-                    .from('video_pillars')
-                    .select('pillar_id')
-                    .eq('video_id', task.videoId)
-
-                let taskPillars: UploadTaskPillar[] = []
-                if (vpData && vpData.length > 0) {
-                    const pillarIds = vpData.map(vp => vp.pillar_id)
-                    const { data: pData } = await supabase
-                        .from('pillars')
-                        .select('id, name, color')
+            for (const task of candidates) {
+                if (cancelled) break
+                if (!task.videoId) continue
+                enrichInFlightRef.current.add(task.id)
+                try {
+                    const { data: tsData, error: tsErr } = await supabase
+                        .from('transcripts')
+                        .select('raw_text, word_count')
+                        .eq('video_id', task.videoId)
                         .eq('user_id', user.id)
-                        .in('id', pillarIds)
-                    if (pData) taskPillars = pData
-                }
+                        .single()
 
-                if (!tsErr && tsData) {
-                    updateTask(task.id, {
-                        transcript: tsData.raw_text,
-                        wordCount: tsData.word_count,
-                        pillars: taskPillars,
-                    })
+                    const { data: vpData } = await supabase
+                        .from('video_pillars')
+                        .select('pillar_id')
+                        .eq('video_id', task.videoId)
+
+                    let taskPillars: UploadTaskPillar[] = []
+                    if (vpData && vpData.length > 0) {
+                        const pillarIds = vpData.map(vp => vp.pillar_id)
+                        const { data: pData } = await supabase
+                            .from('pillars')
+                            .select('id, name, color')
+                            .eq('user_id', user.id)
+                            .in('id', pillarIds)
+                        if (pData) taskPillars = pData
+                    }
+
+                    if (!tsErr && tsData && !cancelled) {
+                        updateTask(task.id, {
+                            transcript: tsData.raw_text,
+                            wordCount: tsData.word_count,
+                            pillars: taskPillars,
+                        })
+                    }
+                } catch (err) {
+                    console.error(`Enrichment failed for task=${task.id}:`, err)
+                } finally {
+                    enrichInFlightRef.current.delete(task.id)
                 }
-            } catch (err) {
-                console.error('Transcript fetch error:', err)
             }
-        })
+        })()
+
+        return () => { cancelled = true }
     }, [tasks, supabase, updateTask])
 
     // When a task transitions to `done`, the bootstrap that just fired may have

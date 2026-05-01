@@ -43,8 +43,12 @@ export function rateLimit(opts: {
 }
 
 export const RATE_LIMITS = {
-    // Video processing is expensive — allow only a handful per 10 minutes.
-    videoProcess: { limit: 5, windowMs: 10 * 60 * 1000 },
+    // Video processing. The original 5/10min was too tight for batch testing
+    // (a creator dropping 8-10 videos in a sitting). 12/10min still leaves
+    // plenty of headroom under Groq free-tier limits (30 RPM, 12K TPM) since
+    // the queue worker processes uploads sequentially anyway — this just
+    // controls how many can sit in the queue at once.
+    videoProcess: { limit: 12, windowMs: 10 * 60 * 1000 },
     // Idea / pillar generation: bursty is fine, cap at 10/minute.
     llmGeneration: { limit: 10, windowMs: 60 * 1000 },
 };

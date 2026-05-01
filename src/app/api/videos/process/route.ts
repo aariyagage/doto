@@ -13,6 +13,7 @@ import ffmpegInstaller from '@ffmpeg-installer/ffmpeg';
 import { ensureEssenceForTranscript } from '@/lib/pillars/essence';
 import { tagOrCreatePillarsForVideo } from '@/lib/pillars/tag-or-create';
 import { detectAndPersistSeriesIfApplicable } from '@/lib/pillars/series-detector';
+import { regenerateVoiceProfileForUser } from '@/lib/pillars/voice-profile';
 import { topUpIdeasForPillars } from '@/lib/pillars/auto-ideas';
 
 ffmpeg.setFfmpegPath(ffmpegInstaller.path);
@@ -323,6 +324,34 @@ export async function POST(request: Request) {
                             });
                         } catch (err) {
                             console.error(`pillar-pipeline series-detector failed video=${videoId}:`, err);
+                        }
+
+                        // 4. Lazy voice profile generation. Voice profile used to
+                        //    be generated inside bootstrap; removing bootstrap
+                        //    silently broke /api/ideas/generate (returns 400 with
+                        //    "no voice profile"). Generate it once whenever it's
+                        //    missing AND the user has at least 2 essence-ready
+                        //    transcripts. Idempotent on subsequent uploads.
+                        try {
+                            const { data: vpRow } = await supabase
+                                .from('voice_profile')
+                                .select('user_id')
+                                .eq('user_id', user.id)
+                                .maybeSingle();
+                            if (!vpRow) {
+                                const { count: essenceReady } = await supabase
+                                    .from('transcripts')
+                                    .select('*', { count: 'exact', head: true })
+                                    .eq('user_id', user.id)
+                                    .or('is_hidden.is.null,is_hidden.eq.false')
+                                    .not('essence', 'is', null);
+                                if ((essenceReady ?? 0) >= 2) {
+                                    await regenerateVoiceProfileForUser(supabase, user.id, groq);
+                                    console.log(`pillar-pipeline voice-profile generated for user=${user.id}`);
+                                }
+                            }
+                        } catch (err) {
+                            console.error(`pillar-pipeline voice-profile failed user=${user.id}:`, err);
                         }
                         // Tell the client pillar tags are ready to fetch. Fired even if
                         // the pillar block threw — the upload-context listener should

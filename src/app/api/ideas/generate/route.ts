@@ -2,8 +2,13 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { rateLimit, RATE_LIMITS } from '@/lib/rate-limit';
 import { generateIdeasForUser } from '@/lib/ideas/generate';
+import { generateIdeasV2ForUser } from '@/lib/ideas/v2';
 
 export const dynamic = 'force-dynamic';
+
+function ideaEngineV2Enabled(): boolean {
+    return process.env.IDEA_ENGINE_V2 === 'true';
+}
 
 export async function POST(request: Request) {
     try {
@@ -31,7 +36,8 @@ export async function POST(request: Request) {
         const pillarIds = Array.isArray(body.pillar_ids) ? (body.pillar_ids as string[]) : [];
         const perPillarCount = Number(body.count) || 3;
 
-        const result = await generateIdeasForUser({ supabase, userId: user.id, pillarIds, perPillarCount });
+        const generator = ideaEngineV2Enabled() ? generateIdeasV2ForUser : generateIdeasForUser;
+        const result = await generator({ supabase, userId: user.id, pillarIds, perPillarCount });
 
         if (result.error) {
             return NextResponse.json({ error: result.error }, { status: 400 });

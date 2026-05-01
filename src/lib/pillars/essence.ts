@@ -2,9 +2,23 @@ import type Groq from 'groq-sdk';
 import { embedText } from './embeddings';
 import type { SupabaseServer } from './types';
 
-const ESSENCE_MIN = 220;
 const ESSENCE_MAX = 360;
 const ESSENCE_INPUT_CAP = 12_000;
+
+const CORE_IDEA_MAX = 160;
+const HOOK_MAX = 100;
+const TAKEAWAY_MAX = 160;
+
+function isV2Enabled(): boolean {
+    return process.env.IDEA_ENGINE_V2 === 'true';
+}
+
+function stripCodeFences(raw: string): string {
+    let out = raw.trim();
+    if (out.startsWith('```json')) out = out.replace(/^```json\n?/, '').replace(/\n?```$/, '');
+    else if (out.startsWith('```')) out = out.replace(/^```\n?/, '').replace(/\n?```$/, '');
+    return out;
+}
 
 export async function generateEssence(transcriptText: string, groq: Groq): Promise<string> {
     const input = transcriptText.length > ESSENCE_INPUT_CAP
@@ -27,18 +41,80 @@ export async function generateEssence(transcriptText: string, groq: Groq): Promi
         ],
     });
 
-    let raw = completion.choices[0]?.message?.content || '';
-    raw = raw.trim();
-    if (raw.startsWith('```json')) raw = raw.replace(/^```json\n?/, '').replace(/\n?```$/, '');
-    else if (raw.startsWith('```')) raw = raw.replace(/^```\n?/, '').replace(/\n?```$/, '');
-
+    const raw = stripCodeFences(completion.choices[0]?.message?.content || '');
     const parsed = JSON.parse(raw) as { essence?: unknown };
     const essence = typeof parsed.essence === 'string' ? parsed.essence.trim() : '';
     if (!essence) throw new Error('Essence response was empty.');
 
-    // Hard-trim if the LLM ignores the upper bound. Lower bound is advisory —
-    // shorter essences still carry signal.
     return essence.length > ESSENCE_MAX ? essence.slice(0, ESSENCE_MAX) : essence;
+}
+
+export type EssenceV2 = {
+    core_idea: string;   // the angle — must include a specific mechanism, scenario, or perspective
+    hook: string | null; // the literal opening line if present, else null
+    takeaway: string;    // what the viewer leaves with
+};
+
+export async function generateEssenceV2(transcriptText: string, groq: Groq): Promise<EssenceV2> {
+    const input = transcriptText.length > ESSENCE_INPUT_CAP
+        ? transcriptText.slice(0, ESSENCE_INPUT_CAP)
+        : transcriptText;
+
+    const completion = await groq.chat.completions.create({
+        model: 'llama-3.3-70b-versatile',
+        temperature: 0.2,
+        response_format: { type: 'json_object' },
+        messages: [
+            {
+                role: 'system',
+                content: [
+                    'You index a creator\'s video transcripts for an idea-generation system.',
+                    'Return JSON with three fields: core_idea, hook, takeaway.',
+                    '',
+                    'core_idea (≤160 chars): the ANGLE of the video, not the topic. It MUST name a specific mechanism, scenario, or perspective — not a general claim.',
+                    '  ❌ "people struggle with productivity because they lack discipline"',
+                    '  ✅ "people fail at productivity because they rely on motivation instead of reducing decisions"',
+                    '  ❌ "this video talks about productivity"',
+                    '  ✅ "morning routines fail because they front-load decisions before willpower has recovered"',
+                    '',
+                    'hook (≤100 chars or null): the LITERAL opening line of the transcript if it functions as a hook. If the transcript opens with filler ("hey guys", "what\'s up") or a generic intro, return null. Do not paraphrase or invent.',
+                    '',
+                    'takeaway (≤160 chars): what the viewer is supposed to walk away believing or doing. Be specific.',
+                    '',
+                    'Hard rules: no markdown, no preamble, no invented specifics, no quoting numbers/names that aren\'t in the transcript. Return ONLY valid JSON.',
+                ].join('\n'),
+            },
+            {
+                role: 'user',
+                content: `Transcript:\n${input}\n\nReturn JSON: { "core_idea": string, "hook": string | null, "takeaway": string }`,
+            },
+        ],
+    });
+
+    const raw = stripCodeFences(completion.choices[0]?.message?.content || '');
+    const parsed = JSON.parse(raw) as { core_idea?: unknown; hook?: unknown; takeaway?: unknown };
+
+    const core_idea = typeof parsed.core_idea === 'string' ? parsed.core_idea.trim() : '';
+    const takeaway = typeof parsed.takeaway === 'string' ? parsed.takeaway.trim() : '';
+    const hookRaw = typeof parsed.hook === 'string' ? parsed.hook.trim() : '';
+    const hook = hookRaw && hookRaw.toLowerCase() !== 'null' ? hookRaw : null;
+
+    if (!core_idea) throw new Error('Essence v2 missing core_idea.');
+    if (!takeaway) throw new Error('Essence v2 missing takeaway.');
+
+    return {
+        core_idea: core_idea.length > CORE_IDEA_MAX ? core_idea.slice(0, CORE_IDEA_MAX) : core_idea,
+        hook: hook && hook.length > HOOK_MAX ? hook.slice(0, HOOK_MAX) : hook,
+        takeaway: takeaway.length > TAKEAWAY_MAX ? takeaway.slice(0, TAKEAWAY_MAX) : takeaway,
+    };
+}
+
+// Concat used as the legacy `essence` column when v2 is on. Pillar tagging
+// matches against essence_embedding, so we want this string to carry both the
+// angle and the upshot — that's what makes a transcript semantically findable.
+function composeLegacyEssence(parts: EssenceV2): string {
+    const concat = `${parts.core_idea} — ${parts.takeaway}`;
+    return concat.length > ESSENCE_MAX ? concat.slice(0, ESSENCE_MAX) : concat;
 }
 
 // Idempotent: skips if essence_generated_at is already set. Generates the
@@ -61,8 +137,32 @@ export async function ensureEssenceForTranscript(
 
     const text = (row.raw_text as string) || '';
     if (text.trim().length < 20) {
-        // Refuse to summarize empty/near-empty transcripts.
         throw new Error(`Transcript ${transcriptId} too short for essence generation.`);
+    }
+
+    if (isV2Enabled()) {
+        const parts = await generateEssenceV2(text, groq);
+        const legacy = composeLegacyEssence(parts);
+        const embedding = await embedText(legacy);
+        const hook_embedding = parts.hook ? await embedText(parts.hook) : null;
+
+        const { error: updateErr } = await supabase
+            .from('transcripts')
+            .update({
+                essence: legacy,
+                essence_core_idea: parts.core_idea,
+                essence_hook: parts.hook,
+                essence_takeaway: parts.takeaway,
+                essence_embedding: embedding,
+                hook_embedding,
+                essence_generated_at: new Date().toISOString(),
+            })
+            .eq('id', transcriptId);
+
+        if (updateErr) {
+            throw new Error(`Failed to persist essence v2 for ${transcriptId}: ${updateErr.message}`);
+        }
+        return { skipped: false };
     }
 
     const essence = await generateEssence(text, groq);

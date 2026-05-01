@@ -76,13 +76,13 @@ export default function PillarSeriesDeclareModal({ open, onClose, videoId, video
                     <X className="h-5 w-5" />
                 </button>
 
-                <h2 className="text-lg font-bold font-heading text-gray-900 dark:text-white mb-1">Declare a series</h2>
-                <p className="text-sm text-[var(--muted-foreground)] font-ui mb-4">
-                    {videoTitle ? <>Mark <span className="font-semibold">{videoTitle}</span> as part of a recurring series.</> : 'Mark this video as part of a recurring series.'}
+                <h2 className="text-lg font-semibold tracking-tight text-[var(--text-primary)] mb-1">Declare a series</h2>
+                <p className="text-sm text-[var(--muted-foreground)] mb-4">
+                    {videoTitle ? <>Mark <span className="font-medium text-[var(--text-primary)]">{videoTitle}</span> as part of a recurring series.</> : 'Mark this video as part of a recurring series.'}
                     {' '}A pillar will be created for the series so future episodes can be tagged automatically.
                 </p>
 
-                <label className="block text-xs font-bold font-heading uppercase tracking-wider text-gray-700 dark:text-gray-300 mb-1">
+                <label className="block text-sm font-medium text-[var(--text-primary)] mb-1.5">
                     Series name
                 </label>
                 <input
@@ -92,36 +92,36 @@ export default function PillarSeriesDeclareModal({ open, onClose, videoId, video
                     placeholder="e.g. Thought Daughter Diaries"
                     maxLength={60}
                     autoFocus
-                    className="w-full mb-4 px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-[var(--bg-primary)] text-gray-900 dark:text-white font-ui text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full mb-4 px-3 py-2 rounded-lg border border-[var(--border-manila)] bg-[var(--bg-panel)] text-[var(--text-primary)] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--text-primary)]/20 focus:border-[var(--text-primary)]/40"
                 />
 
-                <label className="block text-xs font-bold font-heading uppercase tracking-wider text-gray-700 dark:text-gray-300 mb-1">
-                    Description <span className="font-normal lowercase text-gray-400">(optional)</span>
+                <label className="block text-sm font-medium text-[var(--text-primary)] mb-1.5">
+                    Description <span className="font-normal text-[var(--muted-foreground)]">(optional)</span>
                 </label>
                 <textarea
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
                     placeholder="What is this series about?"
                     rows={3}
-                    className="w-full mb-4 px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-[var(--bg-primary)] text-gray-900 dark:text-white font-ui text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                    className="w-full mb-4 px-3 py-2 rounded-lg border border-[var(--border-manila)] bg-[var(--bg-panel)] text-[var(--text-primary)] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--text-primary)]/20 focus:border-[var(--text-primary)]/40 resize-none"
                 />
 
                 {error && (
-                    <p className="text-sm text-red-600 dark:text-red-400 mb-3 font-ui">{error}</p>
+                    <p className="text-sm text-red-600 dark:text-red-400 mb-3">{error}</p>
                 )}
 
                 <div className="flex justify-end gap-2">
                     <button
                         onClick={close}
                         disabled={submitting}
-                        className="px-4 py-2 rounded-lg text-sm font-bold font-heading text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
+                        className="px-4 py-2 rounded-lg text-sm font-medium text-[var(--text-primary)]/70 hover:bg-[var(--text-primary)]/[0.04]"
                     >
                         Cancel
                     </button>
                     <Button
                         onClick={submit}
                         disabled={submitting || !name.trim()}
-                        className="bg-[var(--text-primary)] text-[var(--bg-primary)] hover:scale-[1.02] transition-transform font-heading rounded-lg px-4 py-2"
+                        className="bg-[var(--text-primary)] text-[var(--bg-primary)] hover:opacity-90 transition-opacity font-medium rounded-lg px-4 py-2"
                     >
                         {submitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Declaring…</> : 'Declare series'}
                     </Button>

@@ -87,8 +87,8 @@ export default function DashboardPage() {
                         {/* Header */}
                         <div className="flex items-center justify-between mb-8">
                             <div>
-                                <h1 className="text-2xl md:text-4xl font-heading uppercase tracking-tight text-[var(--text-primary)]">Your Voice</h1>
-                                <p className="font-caslon italic text-lg text-[var(--text-primary)]/70 mt-1">Here is your content engine overview.</p>
+                                <h1 className="text-3xl md:text-[34px] font-semibold tracking-tight text-[var(--text-primary)]">Your voice</h1>
+                                <p className="text-base text-[var(--text-primary)]/60 mt-2">Here&rsquo;s your content engine overview.</p>
                             </div>
                             <LogoutButton />
                         </div>
@@ -101,42 +101,40 @@ export default function DashboardPage() {
                         ) : !stats ? (
                             <div className="flex flex-col items-center justify-center py-24 text-center border-2 border-dashed border-[var(--text-primary)]/10 rounded-3xl bg-[var(--bg-panel)]">
                                 <Home className="h-10 w-10 text-[var(--text-primary)]/30 mb-4" />
-                                <h3 className="text-xl font-heading tracking-tight uppercase text-[var(--text-primary)] mb-2">No data yet</h3>
-                                <p className="font-caslon italic text-lg text-[var(--text-primary)]/70 mb-6 max-w-sm mx-auto">Upload your first video to start generating insights and pillars.</p>
+                                <h3 className="text-xl font-semibold tracking-tight text-[var(--text-primary)] mb-2">No data yet</h3>
+                                <p className="text-base text-[var(--text-primary)]/60 mb-6 max-w-sm mx-auto">Upload your first video to start generating insights and pillars.</p>
                             </div>
                         ) : (
                             <div className="space-y-8 animate-in fade-in duration-500">
 
-                                {/* Editorial stat row — newspaper-style numerals in accent
-                                    colors, separated by thin manila rules, on parchment. */}
-                                <div className="border-y-2 border-double border-[var(--border-manila)] py-6">
-                                    <div className="grid grid-cols-2 md:grid-cols-4 divide-[var(--border-manila)] md:divide-x">
-                                        {[
-                                            { label: 'Videos', sub: 'Processed', value: stats.metrics.totalVideos, color: 'var(--combo-9-bg)' },
-                                            { label: 'Ideas', sub: 'Generated', value: stats.metrics.totalIdeas, color: 'var(--combo-5-bg)' },
-                                            { label: 'Pillars', sub: 'Identified', value: stats.metrics.totalPillars, color: 'var(--combo-3-bg)' },
-                                            { label: 'Saved', sub: 'Bookmarked', value: stats.metrics.totalSavedIdeas, color: 'var(--combo-1-bg)' },
-                                        ].map((m, i) => (
-                                            <div key={m.label} className={`px-6 py-2 flex flex-col ${i > 1 ? 'border-t-2 border-double border-[var(--border-manila)] md:border-t-0 pt-6 md:pt-2' : ''}`}>
-                                                <div className="flex items-baseline gap-3">
-                                                    <span className="font-heading text-5xl md:text-6xl leading-none tabular-nums" style={{ color: m.color }}>
-                                                        {m.value}
-                                                    </span>
-                                                </div>
-                                                <div className="mt-3 flex flex-col">
-                                                    <span className="font-heading uppercase tracking-[0.18em] text-xs text-[var(--text-primary)]">{m.label}</span>
-                                                    <span className="font-caslon italic text-sm text-[var(--text-primary)]/55">{m.sub}</span>
-                                                </div>
+                                {/* Stat cards */}
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                    {[
+                                        { label: 'Videos', sub: 'Processed', value: stats.metrics.totalVideos, color: 'var(--combo-9-bg)' },
+                                        { label: 'Ideas', sub: 'Generated', value: stats.metrics.totalIdeas, color: 'var(--combo-5-bg)' },
+                                        { label: 'Pillars', sub: 'Identified', value: stats.metrics.totalPillars, color: 'var(--combo-3-bg)' },
+                                        { label: 'Saved', sub: 'Bookmarked', value: stats.metrics.totalSavedIdeas, color: 'var(--combo-1-bg)' },
+                                    ].map((m) => (
+                                        <div key={m.label} className="rounded-2xl border border-[var(--border-manila)] bg-[var(--bg-panel)] p-5">
+                                            <div className="flex items-baseline gap-2">
+                                                <span className="text-3xl md:text-4xl font-semibold tracking-tight tabular-nums text-[var(--text-primary)]">
+                                                    {m.value}
+                                                </span>
+                                                <span className="h-2 w-2 rounded-full" style={{ backgroundColor: m.color }} aria-hidden="true" />
                                             </div>
-                                        ))}
-                                    </div>
+                                            <div className="mt-3 flex flex-col">
+                                                <span className="text-sm font-medium text-[var(--text-primary)]">{m.label}</span>
+                                                <span className="text-xs text-[var(--text-primary)]/50 mt-0.5">{m.sub}</span>
+                                            </div>
+                                        </div>
+                                    ))}
                                 </div>
 
                                 {/* Main Chart Area */}
                                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                                    <div className="lg:col-span-2 bg-[var(--bg-panel)] border border-[var(--text-primary)]/10 rounded-3xl p-6 shadow-sm">
-                                        <h3 className="text-lg font-heading tracking-tight text-[var(--text-primary)] mb-6 flex items-center gap-2">
-                                            Content Pipeline Distribution
+                                    <div className="lg:col-span-2 bg-[var(--bg-panel)] border border-[var(--border-manila)] rounded-2xl p-6">
+                                        <h3 className="text-base font-semibold tracking-tight text-[var(--text-primary)] mb-6 flex items-center gap-2">
+                                            Content pipeline distribution
                                         </h3>
                                         <div className="h-80 w-full">
                                             {stats.chartData.length > 0 ? (
@@ -171,7 +169,7 @@ export default function DashboardPage() {
                                                     </BarChart>
                                                 </ResponsiveContainer>
                                             ) : (
-                                                <div className="h-full w-full flex items-center justify-center text-gray-400 text-sm italic">
+                                                <div className="h-full w-full flex items-center justify-center text-[var(--text-primary)]/40 text-sm">
                                                     Not enough data to generate chart.
                                                 </div>
                                             )}
@@ -179,8 +177,8 @@ export default function DashboardPage() {
                                     </div>
 
                                     {/* Recent Activity */}
-                                    <div className="bg-[var(--bg-panel)] border border-[var(--text-primary)]/10 rounded-3xl p-6 shadow-sm flex flex-col">
-                                        <h3 className="text-lg font-heading tracking-tight text-[var(--text-primary)] mb-6">Recent Activity</h3>
+                                    <div className="bg-[var(--bg-panel)] border border-[var(--border-manila)] rounded-2xl p-6 flex flex-col">
+                                        <h3 className="text-base font-semibold tracking-tight text-[var(--text-primary)] mb-6">Recent activity</h3>
                                         <div className="flex-1 space-y-4">
                                             {stats.recentActivity.length > 0 ? (
                                                 stats.recentActivity.map((activity, idx) => (
@@ -213,7 +211,7 @@ export default function DashboardPage() {
                                                     </div>
                                                 ))
                                             ) : (
-                                                <div className="text-center text-[var(--text-primary)]/40 text-sm py-10 italic font-caslon">
+                                                <div className="text-center text-[var(--text-primary)]/40 text-sm py-10">
                                                     No recent activity found.
                                                 </div>
                                             )}

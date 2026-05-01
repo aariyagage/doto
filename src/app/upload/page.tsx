@@ -46,8 +46,8 @@ export default function UploadPage() {
                 <main className="flex-1 w-full">
                     <div className="w-full max-w-4xl mx-auto space-y-6">
                         <div className="flex items-center justify-between mb-8">
-                            <h1 className="text-2xl md:text-4xl font-heading uppercase tracking-tight text-[var(--text-primary)]">Upload Videos</h1>
-                            <Button variant="outline" onClick={() => router.push('/dashboard')} className="border-[var(--border-manila)] bg-transparent text-[var(--text-primary)]">Back to Dashboard</Button>
+                            <h1 className="text-3xl md:text-[34px] font-semibold tracking-tight text-[var(--text-primary)]">Upload videos</h1>
+                            <Button variant="outline" onClick={() => router.push('/dashboard')} className="border-[var(--border-manila)] bg-transparent text-[var(--text-primary)] font-medium">Back to dashboard</Button>
                         </div>
 
                         <div
@@ -67,15 +67,15 @@ export default function UploadPage() {
                             aria-label="Upload videos: drag files here or press Enter to browse"
                         >
                             <input type="file" ref={fileInputRef} onChange={handleFileInput} accept="video/*" multiple className="hidden" />
-                            <UploadCloud className={`mb-4 h-16 w-16 transition-colors duration-300 ${isDragging ? 'text-[var(--combo-3-bg)]' : 'text-[var(--text-primary)]/30'}`} />
-                            <p className="mb-2 font-heading uppercase tracking-[0.14em] text-sm text-[var(--text-primary)]">Drag videos here, or click to browse</p>
-                            <p className="font-caslon italic text-base text-[var(--text-primary)]/60">MP4, WebM, or MOV &mdash; up to 500MB per file</p>
+                            <UploadCloud className={`mb-4 h-12 w-12 transition-colors duration-300 ${isDragging ? 'text-[var(--combo-3-bg)]' : 'text-[var(--text-primary)]/30'}`} strokeWidth={1.5} />
+                            <p className="mb-2 text-base font-medium text-[var(--text-primary)]">Drag videos here, or click to browse</p>
+                            <p className="text-sm text-[var(--text-primary)]/55">MP4, WebM, or MOV &mdash; up to 500MB per file</p>
                         </div>
 
-                        <p className="font-caslon italic text-[var(--text-primary)]/50 text-center">Videos are processed one at a time to ensure quality. Uploads continue if you switch tabs.</p>
+                        <p className="text-sm text-[var(--text-primary)]/50 text-center">Videos are processed one at a time to ensure quality. Uploads continue if you switch tabs.</p>
 
                         {completedCount > 0 && (
-                            <div className="text-center font-caslon italic text-lg text-[var(--text-primary)]/70 mt-2">
+                            <div className="text-center text-base text-[var(--text-primary)]/65 mt-2">
                                 {completedCount === 1 && "1 video analyzed \u00b7 head to Ideas to discover your pillars"}
                                 {(completedCount >= 2 && completedCount <= 4) && `${completedCount} videos analyzed \u00b7 head to Ideas to discover your pillars`}
                                 {completedCount >= 5 && `${completedCount} videos analyzed \u00b7 great coverage`}
@@ -90,7 +90,7 @@ export default function UploadPage() {
                                             <span className="truncate font-medium text-[var(--text-primary)] max-w-[50%]" title={task.file.name}>
                                                 {task.file.name}
                                             </span>
-                                            <span className="text-xs font-heading uppercase tracking-wider text-[var(--text-primary)]/40">{(task.file.size / (1024 * 1024)).toFixed(1)} MB</span>
+                                            <span className="text-xs font-medium text-[var(--text-primary)]/45">{(task.file.size / (1024 * 1024)).toFixed(1)} MB</span>
 
                                             <div className="absolute top-4 right-4 flex items-center gap-2">
                                                 {(task.status === 'error' || task.status === 'cancelled') && (
@@ -134,7 +134,7 @@ export default function UploadPage() {
                                                                     (adjustedCurrentIdx === idx && (task.status === 'error' || task.status === 'cancelled')) ? <AlertCircle className="h-4 w-4" /> :
                                                                         <div className="h-2 w-2 rounded-full bg-current" />}
                                                         </div>
-                                                        <span className={`text-[10px] font-heading font-bold uppercase tracking-widest ${adjustedCurrentIdx >= idx ? 'text-[var(--text-primary)]' : 'text-[var(--text-primary)]/35'}`}>{step}</span>
+                                                        <span className={`text-[10px] font-medium ${adjustedCurrentIdx >= idx ? 'text-[var(--text-primary)]' : 'text-[var(--text-primary)]/40'}`}>{step}</span>
                                                     </div>
                                                 )
                                             })}
@@ -151,20 +151,20 @@ export default function UploadPage() {
                                             <div className="mt-6 rounded-2xl bg-[var(--bg-primary)] p-4 border border-[var(--border-manila-soft)] text-sm text-[var(--text-primary)] relative">
                                                 <div className="flex items-center justify-between mb-4">
                                                     <div className="flex items-center gap-3">
-                                                        <h4 className="font-heading uppercase tracking-widest text-xs text-[var(--text-primary)] flex items-center gap-2">
+                                                        <h4 className="text-sm font-semibold tracking-tight text-[var(--text-primary)] flex items-center gap-2">
                                                             <CheckCircle2 className="h-4 w-4 text-[var(--combo-3-bg)]" />
-                                                            Extracted Transcript
+                                                            Extracted transcript
                                                         </h4>
                                                         {(task.pillars && task.pillars.length > 0) ? (
                                                             <div className="flex gap-1.5 ml-2">
                                                                 {task.pillars.map(p => (
-                                                                    <span key={p.id} style={{ backgroundColor: p.color, color: getPairedTextColor(p.color) }} className="text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-widest">
+                                                                    <span key={p.id} style={{ backgroundColor: p.color, color: getPairedTextColor(p.color) }} className="text-[10px] font-medium px-2 py-0.5 rounded">
                                                                         {p.name}
                                                                     </span>
                                                                 ))}
                                                             </div>
                                                         ) : (
-                                                            <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-[var(--border-manila)] text-[var(--text-primary)]/60 uppercase tracking-widest ml-2 flex items-center gap-1">
+                                                            <span className="text-[10px] font-medium px-2 py-0.5 rounded bg-[var(--text-primary)]/[0.06] text-[var(--text-primary)]/60 ml-2 flex items-center gap-1">
                                                                 Uncategorized
                                                             </span>
                                                         )}
@@ -177,7 +177,7 @@ export default function UploadPage() {
                                                     </div>
                                                 </div>
                                                 <div className="max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
-                                                    <p className="whitespace-pre-wrap leading-relaxed font-caslon text-base text-[var(--text-primary)]/80">{task.transcript}</p>
+                                                    <p className="whitespace-pre-wrap leading-relaxed text-sm text-[var(--text-primary)]/75">{task.transcript}</p>
                                                 </div>
                                             </div>
                                         )}

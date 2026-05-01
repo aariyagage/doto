@@ -352,7 +352,7 @@ export default function IdeasPage() {
                 const { data } = await supabase.from('pillars').select('*').order('created_at', { ascending: true })
                 if (data) setPillars(data)
                 await fetchPillarState()
-                showToast("Pillars regenerated!")
+                showToast("pillars regenerated!")
             } else {
                 // Surface the real error from the API so we can debug instead
                 // of staring at a generic "Failed to regenerate."
@@ -419,7 +419,7 @@ export default function IdeasPage() {
                     <div className="w-full max-w-7xl mx-auto space-y-8">
                         {/* Top Bar */}
                         <div className="flex items-center justify-between mb-8">
-                            <h1 className="text-3xl md:text-[34px] font-semibold tracking-tight text-[var(--text-primary)]">Ideas</h1>
+                            <h1 className="text-title-1 text-ink">ideas</h1>
                             <div className="flex items-center gap-3">
                                 {ideas.length > 0 && (
                                     <Button
@@ -429,21 +429,21 @@ export default function IdeasPage() {
                                         className="text-red-500 hover:bg-red-50 hover:text-red-600 border-red-200 transition-all font-medium rounded-full px-5 py-5 shadow-sm"
                                     >
                                         {isDeletingAll ? (
-                                            <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Clearing...</>
+                                            <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> clearing...</>
                                         ) : (
-                                            <><Trash2 className="mr-2 h-4 w-4" /> Start fresh</>
+                                            <><Trash2 className="mr-2 h-4 w-4" /> start fresh</>
                                         )}
                                     </Button>
                                 )}
                                 <Button
                                     onClick={generateBatch}
                                     disabled={isGenerating || isDeletingAll}
-                                    className="bg-black text-white hover:bg-gray-800 transition-all font-medium rounded-full px-5 py-5 shadow-sm min-w-[170px]"
+                                    className="bg-ink text-paper hover:bg-ink/90 transition-all font-medium rounded-full px-5 py-5 shadow-sm min-w-[170px]"
                                 >
                                     {isGenerating ? (
-                                        <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Generating...</>
+                                        <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> generating...</>
                                     ) : (
-                                        <><Sparkles className="mr-2 h-4 w-4" /> ✦ Generate ideas</>
+                                        <><Sparkles className="mr-2 h-4 w-4" /> ✦ generate ideas</>
                                     )}
                                 </Button>
                             </div>
@@ -453,8 +453,8 @@ export default function IdeasPage() {
                         <div className="mb-4">
                             <div className="flex items-start justify-between mb-5">
                                 <div>
-                                    <h3 className="text-base font-semibold tracking-tight text-[var(--text-primary)] leading-tight">Your content pillars</h3>
-                                    <p className="text-[var(--muted-foreground)] font-ui text-sm mt-1">Folders for your videos. Click Discover to organize them, or select pillars below to filter ideas.</p>
+                                    <h3 className="text-title-3 text-ink leading-tight">your content pillars</h3>
+                                    <p className="text-ink-muted text-sm mt-1">folders for your videos. click discover to organize them, or select pillars below to filter ideas.</p>
                                 </div>
                                 <div className="flex items-center gap-2">
                                     {pillars.length > 0 && (
@@ -464,7 +464,7 @@ export default function IdeasPage() {
                                             className="text-xs font-medium text-red-500 hover:text-red-600 transition-colors flex items-center whitespace-nowrap bg-red-50 dark:bg-red-500/10 hover:bg-red-100 dark:hover:bg-red-500/20 px-3 py-1.5 rounded-lg"
                                         >
                                             {isDeletingPillars ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : <Trash2 className="h-4 w-4 mr-1.5" />}
-                                            Clear all
+                                            clear all
                                         </button>
                                     )}
                                     {/* Discover/Regenerate is always visible once the user has at least
@@ -477,7 +477,7 @@ export default function IdeasPage() {
                                             className="text-xs font-medium text-blue-600 hover:text-blue-700 transition-colors flex items-center whitespace-nowrap bg-blue-50 dark:bg-blue-500/10 hover:bg-blue-100 px-3 py-1.5 rounded-lg"
                                         >
                                             {isRegeneratingPillars ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : <RefreshCw className="h-4 w-4 mr-1.5" />}
-                                            {pillars.length === 0 ? 'Discover Pillars' : 'Regenerate'}
+                                            {pillars.length === 0 ? 'discover pillars' : 'regenerate'}
                                         </button>
                                     )}
                                 </div>
@@ -486,8 +486,8 @@ export default function IdeasPage() {
                             {/* Soft-cap nudge: pillar list is getting unwieldy. */}
                             {pillarState?.isOverSoftCap && (
                                 <div className="mb-4 px-4 py-3 rounded-lg bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/30">
-                                    <p className="text-sm font-ui text-amber-900 dark:text-amber-100">
-                                        You have {pillarState.pillarCount} pillars. Content tends to lose focus past {pillarState.softCap} —
+                                    <p className="text-sm text-amber-900 dark:text-amber-100">
+                                        you have {pillarState.pillarCount} pillars. content tends to lose focus past {pillarState.softCap} —
                                         consider deleting the least-tagged ones below.
                                     </p>
                                 </div>
@@ -496,16 +496,16 @@ export default function IdeasPage() {
                             {/* Stale-pillar nudge: recent uploads aren't fitting any existing pillar. */}
                             {pillarState?.shouldShowStaleNudge && (
                                 <div className="mb-4 px-4 py-3 rounded-lg bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/30 flex items-center justify-between gap-4">
-                                    <p className="text-sm font-ui text-blue-900 dark:text-blue-100">
+                                    <p className="text-sm text-blue-900 dark:text-blue-100">
                                         {pillarState.untaggedRecentVideos} recent video{pillarState.untaggedRecentVideos === 1 ? '' : 's'}{' '}
-                                        didn&apos;t fit any pillar. Your content may have shifted.
+                                        didn&apos;t fit any pillar. your content may have shifted.
                                     </p>
                                     <button
                                         onClick={regeneratePillars}
                                         disabled={isRegeneratingPillars}
                                         className="text-xs font-medium text-blue-700 dark:text-blue-200 hover:underline whitespace-nowrap"
                                     >
-                                        {isRegeneratingPillars ? 'Regenerating…' : 'Regenerate →'}
+                                        {isRegeneratingPillars ? 'regenerating…' : 'regenerate →'}
                                     </button>
                                 </div>
                             )}
@@ -513,25 +513,25 @@ export default function IdeasPage() {
                             <div className="flex flex-wrap gap-4 relative">
                                 {pillars.length === 0 ? (
                                     (pillarState?.eligibleTranscriptCount ?? 0) < 1 ? (
-                                        <p className="text-gray-500 dark:text-gray-400 text-sm w-full font-ui">
-                                            Upload a video to get started.
+                                        <p className="text-ink-muted text-sm w-full">
+                                            upload a video to get started.
                                             {' '}
-                                            <a href="/upload" className="font-bold text-blue-600 hover:underline">Upload now →</a>
+                                            <a href="/upload" className="font-bold text-blue-600 hover:underline">upload now →</a>
                                         </p>
                                     ) : (
-                                        <p className="text-gray-400 dark:text-gray-500 text-sm italic w-full font-ui">
-                                            You have {pillarState?.eligibleTranscriptCount ?? 0} video{(pillarState?.eligibleTranscriptCount ?? 0) === 1 ? '' : 's'} ready.
-                                            Click <span className="font-bold text-blue-600">Discover Pillars</span> above to organize them into folders.
+                                        <p className="text-ink-faint text-sm italic w-full">
+                                            you have {pillarState?.eligibleTranscriptCount ?? 0} video{(pillarState?.eligibleTranscriptCount ?? 0) === 1 ? '' : 's'} ready.
+                                            click <span className="font-bold text-blue-600">discover pillars</span> above to organize them into folders.
                                         </p>
                                     )
                                 ) : (
                                     <div
                                         onClick={() => setSelectedPillars([])}
-                                        className={`group relative flex items-center justify-center cursor-pointer transition-transform hover:-translate-y-1 h-10 px-5 rounded-t-xl rounded-br-xl ${selectedPillars.length === 0 ? 'bg-gray-900 dark:bg-white text-white dark:text-gray-900 z-10' : 'bg-gray-200 dark:bg-gray-800 text-gray-700 dark:text-gray-300'}`}
+                                        className={`group relative flex items-center justify-center cursor-pointer transition-transform hover:-translate-y-1 h-10 px-5 rounded-t-xl rounded-br-xl ${selectedPillars.length === 0 ? 'bg-ink text-paper z-10' : 'bg-paper-sunken text-ink-muted'}`}
                                         style={{ borderTopLeftRadius: '0.75rem' }}
                                     >
-                                        <div className={`absolute -top-2.5 left-0 w-1/2 h-3.5 rounded-t-lg ${selectedPillars.length === 0 ? 'bg-gray-900 dark:bg-white' : 'bg-gray-200 dark:bg-gray-800'}`}></div>
-                                        <span className="font-medium text-xs relative z-10">All ideas</span>
+                                        <div className={`absolute -top-2.5 left-0 w-1/2 h-3.5 rounded-t-lg ${selectedPillars.length === 0 ? 'bg-ink' : 'bg-paper-sunken'}`}></div>
+                                        <span className="font-medium text-xs relative z-10">all ideas</span>
                                     </div>
                                 )}
 
@@ -541,7 +541,7 @@ export default function IdeasPage() {
 
                                     if (isEditing) {
                                         return (
-                                            <div key={p.id} className="group relative flex items-center h-10 bg-[var(--bg-panel)] border-2 border-[#125603] rounded-t-xl rounded-br-xl px-2 z-20">
+                                            <div key={p.id} className="group relative flex items-center h-10 bg-paper-elevated border-2 border-[#125603] rounded-t-xl rounded-br-xl px-2 z-20">
                                                 <input
                                                     type="text"
                                                     value={editingPillarName}
@@ -552,7 +552,7 @@ export default function IdeasPage() {
                                                     }}
                                                     onBlur={() => savePillarRename(p.id)}
                                                     autoFocus
-                                                    className="font-ui text-xs font-bold outline-none border-none py-1 min-w-[110px] bg-transparent text-gray-900 dark:text-white"
+                                                    className="text-xs font-bold outline-none border-none py-1 min-w-[110px] bg-transparent text-ink"
                                                 />
                                             </div>
                                         )
@@ -567,7 +567,7 @@ export default function IdeasPage() {
                                                 color: isSelected ? '#111827' : undefined,
                                                 borderColor: !isSelected ? p.color : 'transparent',
                                             }}
-                                            className={`group relative flex items-center gap-2 h-10 px-4 cursor-pointer transition-transform hover:-translate-y-1 rounded-t-xl rounded-br-xl shadow-sm hover:shadow ${!isSelected ? 'bg-[var(--bg-panel)] border-2 opacity-80 hover:opacity-100 text-gray-700 dark:text-gray-300' : 'font-bold border border-black/10 z-10'}`}
+                                            className={`group relative flex items-center gap-2 h-10 px-4 cursor-pointer transition-transform hover:-translate-y-1 rounded-t-xl rounded-br-xl shadow-sm hover:shadow ${!isSelected ? 'bg-paper-elevated border-2 opacity-80 hover:opacity-100 text-ink-muted' : 'font-bold border border-black/10 z-10'}`}
                                         >
                                             <div
                                                 className="absolute -top-2.5 left-0 w-1/2 h-3.5 rounded-t-lg transition-colors"
@@ -592,15 +592,15 @@ export default function IdeasPage() {
                                             </span>
                                             {p.is_series && (
                                                 <span
-                                                    className={`text-[10px] font-semibold rounded-sm px-1 py-0.5 relative z-10 ${isSelected ? 'bg-black/10 text-black/70' : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300'}`}
-                                                    title="Series pillar"
+                                                    className={`text-[10px] font-semibold rounded-sm px-1 py-0.5 relative z-10 ${isSelected ? 'bg-black/10 text-black/70' : 'bg-paper-sunken text-ink-muted'}`}
+                                                    title="series pillar"
                                                 >
-                                                    Series
+                                                    series
                                                 </span>
                                             )}
                                             <button
                                                 onClick={(e) => deletePillar(e, p.id)}
-                                                className={`rounded-md p-1 transition-all opacity-0 group-hover:opacity-100 relative z-10 ${isSelected ? 'text-black/50 hover:bg-black/10' : 'text-gray-400 hover:text-red-500 hover:bg-gray-100 dark:hover:bg-gray-800'}`}
+                                                className={`rounded-md p-1 transition-all opacity-0 group-hover:opacity-100 relative z-10 ${isSelected ? 'text-black/50 hover:bg-black/10' : 'text-ink-faint hover:text-red-500 hover:bg-paper-sunken'}`}
                                                 title="Delete pillar"
                                             >
                                                 <X className="h-3.5 w-3.5 stroke-[3]" />
@@ -612,14 +612,14 @@ export default function IdeasPage() {
                         </div>
 
                         {/* Filter Row 2: Status Controls */}
-                        <div className="flex gap-1 p-1 bg-black/5 dark:bg-white/5 rounded-lg w-fit">
-                            {['All', 'Saved', 'Used'].map(status => (
+                        <div className="flex gap-1 p-1 bg-ink/5 dark:bg-ink/5 rounded-lg w-fit">
+                            {(['All', 'Saved', 'Used'] as const).map(status => (
                                 <button
                                     key={status}
-                                    onClick={() => setFilterStatus(status as any)}
-                                    className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${filterStatus === status ? 'bg-[var(--bg-panel)] shadow-sm text-[var(--text-primary)]' : 'text-[var(--text-primary)]/55 hover:text-[var(--text-primary)]'}`}
+                                    onClick={() => setFilterStatus(status)}
+                                    className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${filterStatus === status ? 'bg-paper-elevated shadow-sm text-ink' : 'text-ink-muted hover:text-ink'}`}
                                 >
-                                    {status}
+                                    {status.toLowerCase()}
                                 </button>
                             ))}
                         </div>
@@ -629,28 +629,28 @@ export default function IdeasPage() {
                             {/* Loading State */}
                             {isLoading && (
                                 Array.from({ length: 4 }).map((_, i) => (
-                                    <div key={`loading-${i}`} className="h-64 rounded-2xl bg-gray-200 animate-pulse w-full"></div>
+                                    <div key={`loading-${i}`} className="h-64 rounded-2xl bg-paper-sunken animate-pulse w-full"></div>
                                 ))
                             )}
 
                             {/* Batch Generating State Skeleton */}
                             {isGenerating && (
                                 Array.from({ length: 3 }).map((_, i) => (
-                                    <div key={`gen-${i}`} className="h-64 rounded-2xl bg-gray-200 animate-pulse w-full"></div>
+                                    <div key={`gen-${i}`} className="h-64 rounded-2xl bg-paper-sunken animate-pulse w-full"></div>
                                 ))
                             )}
 
                             {!isLoading && filteredIdeas.length === 0 && !isGenerating && (
                                 <div className="flex flex-col items-center justify-center py-24 text-center">
-                                    <div className="bg-blue-50 p-4 rounded-full mb-4 flex items-center justify-center">
-                                        <Sparkles className="h-12 w-12 text-blue-500" />
+                                    <div className="bg-paper-sunken p-4 rounded-full mb-4 flex items-center justify-center">
+                                        <Sparkles className="h-12 w-12 text-ink-faint" />
                                     </div>
-                                    <h3 className="text-lg font-bold text-gray-900 mb-2">No ideas yet</h3>
-                                    <p className="text-sm text-gray-500 mb-6 max-w-sm">
-                                        Generate your first batch of personalized content ideas tailored strictly to your voice profile.
+                                    <h3 className="text-title-3 text-ink mb-2">no ideas yet</h3>
+                                    <p className="text-body-sm text-ink-muted mb-6 max-w-sm">
+                                        generate your first batch of personalized content ideas tailored strictly to your voice profile.
                                     </p>
-                                    <Button onClick={generateBatch} className="bg-black text-white hover:bg-gray-800 rounded-full px-6 transition-colors">
-                                        ✦ Generate ideas
+                                    <Button onClick={generateBatch} className="bg-ink text-paper hover:bg-ink/90 rounded-full px-6 transition-colors">
+                                        ✦ generate ideas
                                     </Button>
                                 </div>
                             )}
@@ -658,26 +658,26 @@ export default function IdeasPage() {
                             {/* Render Ideas */}
                             {!isLoading && filteredIdeas.map(idea => {
                                 const pillar = idea.pillars || pillars.find(p => p.id === idea.pillar_id)
-                                const comboColorBg = pillar?.color || 'var(--bg-panel)';
+                                const comboColorBg = pillar?.color || 'var(--paper-elevated)';
                                 const isDefault = !pillar?.color;
 
                                 return (
                                     <div
                                         key={idea.id}
-                                        className={`relative flex flex-col rounded-3xl border ${isDefault ? 'border-gray-200 dark:border-gray-800 bg-[var(--bg-panel)]' : 'border-transparent'} p-6 shadow-sm transition-opacity duration-300 ${idea.is_used ? 'opacity-50' : 'opacity-100'} overflow-hidden`}
+                                        className={`relative flex flex-col rounded-3xl border ${isDefault ? 'border-rule bg-paper-elevated' : 'border-transparent'} p-6 shadow-sm transition-opacity duration-300 ${idea.is_used ? 'opacity-50' : 'opacity-100'} overflow-hidden`}
                                         style={{ backgroundColor: isDefault ? undefined : comboColorBg }}
                                     >
                                         {!isDefault && (
                                             <div className="absolute right-0 top-0 bottom-0 w-32 pointer-events-none z-0">
-                                                <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="w-full h-full text-[var(--bg-primary)] fill-current opacity-20 dark:opacity-5">
+                                                <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="w-full h-full text-paper fill-current opacity-20 dark:opacity-5">
                                                     <path d="M100,0 L0,50 L100,100 Z" />
                                                 </svg>
                                             </div>
                                         )}
 
                                         {idea.isRegenerating && (
-                                            <div className="absolute inset-0 z-20 flex items-center justify-center bg-white/80 dark:bg-black/80 rounded-3xl backdrop-blur-sm">
-                                                <Loader2 className="h-8 w-8 animate-spin text-gray-900 dark:text-white" />
+                                            <div className="absolute inset-0 z-20 flex items-center justify-center bg-paper-elevated/80 dark:bg-paper/80 rounded-3xl backdrop-blur-sm">
+                                                <Loader2 className="h-8 w-8 animate-spin text-ink" />
                                             </div>
                                         )}
 
@@ -685,73 +685,73 @@ export default function IdeasPage() {
                                             {/* Card Top Row - Pillar Badge Only */}
                                             <div className="mb-3 flex items-center justify-between">
                                                 <span
-                                                    className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-medium ${isDefault ? 'bg-[var(--text-primary)]/[0.06] text-[var(--text-primary)]/65' : 'bg-black/10 text-gray-900'}`}
+                                                    className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-medium ${isDefault ? 'bg-ink/[0.06] text-ink-muted' : 'bg-black/10 text-gray-900'}`}
                                                 >
-                                                    {pillar?.name || 'Uncategorized'}
+                                                    {pillar?.name || 'uncategorized'}
                                                 </span>
                                                 <button
                                                     onClick={() => toggleSave(idea.id, idea.is_saved)}
-                                                    className={`transition-colors hover:scale-110 ${idea.is_saved ? (isDefault ? 'text-blue-500' : 'text-gray-900') : (isDefault ? 'text-gray-300 dark:text-gray-600 hover:text-gray-500' : 'text-black/30 hover:text-black/60')}`}
+                                                    className={`transition-colors hover:scale-110 ${idea.is_saved ? (isDefault ? 'text-blue-500' : 'text-gray-900') : (isDefault ? 'text-ink-faint hover:text-ink-muted' : 'text-black/30 hover:text-black/60')}`}
                                                 >
                                                     <Star className={`h-5 w-5 ${idea.is_saved ? 'fill-current' : ''}`} strokeWidth={idea.is_saved ? 2 : 1.5} />
                                                 </button>
                                             </div>
 
                                             {/* Title */}
-                                            <h2 className={`text-xl md:text-2xl font-semibold tracking-tight leading-tight mb-5 ${isDefault ? 'text-[var(--text-primary)]' : 'text-gray-900'}`}>
+                                            <h2 className={`text-xl md:text-2xl font-semibold tracking-tight leading-tight mb-5 ${isDefault ? 'text-ink' : 'text-gray-900'}`}>
                                                 {idea.title}
                                             </h2>
 
                                             {/* Hook Section */}
                                             <div className="mb-5">
-                                                <span className={`text-[11px] font-semibold block mb-1.5 ${isDefault ? 'text-[var(--text-primary)]/45' : 'text-black/50'}`}>Hook</span>
-                                                <p className={`text-base md:text-lg font-medium ${isDefault ? 'text-[var(--text-primary)]/85' : 'text-gray-900'}`}>
+                                                <span className={`text-[11px] font-semibold block mb-1.5 ${isDefault ? 'text-ink-faint' : 'text-black/50'}`}>hook</span>
+                                                <p className={`text-base md:text-lg font-medium ${isDefault ? 'text-ink' : 'text-gray-900'}`}>
                                                     &ldquo;{idea.hook}&rdquo;
                                                 </p>
                                             </div>
 
                                             {/* Expandable Structure */}
-                                            <div className={`mb-6 pt-4 border-t ${isDefault ? 'border-gray-100 dark:border-gray-800' : 'border-black/10'}`}>
+                                            <div className={`mb-6 pt-4 border-t ${isDefault ? 'border-rule-soft' : 'border-black/10'}`}>
                                                 <button
                                                     onClick={() => setIdeas(prev => prev.map(i => i.id === idea.id ? { ...i, isExpanded: !idea.isExpanded } : i))}
-                                                    className={`flex items-center text-xs font-medium transition-colors ${isDefault ? 'text-[var(--text-primary)]/60 hover:text-[var(--text-primary)]' : 'text-black/70 hover:text-black'}`}
+                                                    className={`flex items-center text-xs font-medium transition-colors ${isDefault ? 'text-ink-muted hover:text-ink' : 'text-black/70 hover:text-black'}`}
                                                 >
                                                     {idea.isExpanded ? (
-                                                        <><ChevronUp className="mr-1 h-3.5 w-3.5" /> Less</>
+                                                        <><ChevronUp className="mr-1 h-3.5 w-3.5" /> less</>
                                                     ) : (
-                                                        <><ChevronDown className="mr-1 h-3.5 w-3.5" /> Structure &amp; concept</>
+                                                        <><ChevronDown className="mr-1 h-3.5 w-3.5" /> structure &amp; concept</>
                                                     )}
                                                 </button>
 
                                                 {idea.isExpanded && (
-                                                    <div className={`mt-5 space-y-5 rounded-2xl p-5 md:p-6 animate-in slide-in-from-top-2 fade-in duration-200 ${isDefault ? 'bg-gray-50 dark:bg-gray-800/50' : 'bg-black/5'}`}>
+                                                    <div className={`mt-5 space-y-5 rounded-2xl p-5 md:p-6 animate-in slide-in-from-top-2 fade-in duration-200 ${isDefault ? 'bg-paper-sunken' : 'bg-black/5'}`}>
                                                         <div>
-                                                            <span className={`text-[11px] font-semibold block mb-2 ${isDefault ? 'text-[var(--text-primary)]/45' : 'text-black/40'}`}>Structure</span>
-                                                            <p className={`text-sm leading-relaxed whitespace-pre-wrap ${isDefault ? 'text-[var(--text-primary)]/75' : 'text-gray-900'}`}>
+                                                            <span className={`text-[11px] font-semibold block mb-2 ${isDefault ? 'text-ink-faint' : 'text-black/40'}`}>structure</span>
+                                                            <p className={`text-sm leading-relaxed whitespace-pre-wrap ${isDefault ? 'text-ink-muted' : 'text-gray-900'}`}>
                                                                 {idea.structure.split('→').map((step, idx, arr) => (
                                                                     <span key={idx}>
                                                                         {step.trim()}
-                                                                        {idx < arr.length - 1 && <span className={`mx-2 ${isDefault ? 'text-gray-300 dark:text-gray-600' : 'text-black/20'}`}>→</span>}
+                                                                        {idx < arr.length - 1 && <span className={`mx-2 ${isDefault ? 'text-ink-faint' : 'text-black/20'}`}>→</span>}
                                                                     </span>
                                                                 ))}
                                                             </p>
                                                         </div>
                                                         <div>
-                                                            <span className={`text-[11px] font-semibold block mb-2 ${isDefault ? 'text-[var(--text-primary)]/45' : 'text-black/40'}`}>Concept</span>
-                                                            <p className={`text-sm leading-relaxed ${isDefault ? 'text-[var(--text-primary)]/75' : 'text-gray-900'}`}>{idea.reasoning}</p>
+                                                            <span className={`text-[11px] font-semibold block mb-2 ${isDefault ? 'text-ink-faint' : 'text-black/40'}`}>concept</span>
+                                                            <p className={`text-sm leading-relaxed ${isDefault ? 'text-ink-muted' : 'text-gray-900'}`}>{idea.reasoning}</p>
                                                         </div>
                                                     </div>
                                                 )}
                                             </div>
 
                                             {/* Card Bottom Row */}
-                                            <div className={`flex items-center justify-between mt-auto pt-4 border-t ${isDefault ? 'border-gray-100 dark:border-gray-800' : 'border-black/10'}`}>
+                                            <div className={`flex items-center justify-between mt-auto pt-4 border-t ${isDefault ? 'border-rule-soft' : 'border-black/10'}`}>
                                                 <div className="flex items-center gap-4">
                                                     <button
                                                         onClick={() => regenerateIdea(idea.id, idea.pillar_id)}
-                                                        className={`text-xs font-medium transition-colors flex items-center ${isDefault ? 'text-[var(--text-primary)]/50 hover:text-[var(--text-primary)]' : 'text-black/50 hover:text-black'}`}
+                                                        className={`text-xs font-medium transition-colors flex items-center ${isDefault ? 'text-ink-muted hover:text-ink' : 'text-black/50 hover:text-black'}`}
                                                     >
-                                                        ↺ Regenerate
+                                                        ↺ regenerate
                                                     </button>
                                                 </div>
 
@@ -759,22 +759,22 @@ export default function IdeasPage() {
                                                     <button
                                                         onClick={() => markAsUsed(idea.id)}
                                                         disabled={idea.is_used}
-                                                        className={`flex items-center px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${idea.is_used ? (isDefault ? 'bg-green-50 text-green-600 dark:bg-green-500/10 dark:text-green-400' : 'bg-black/10 text-gray-900') : (isDefault ? 'bg-[var(--text-primary)]/[0.06] text-[var(--text-primary)]/65 hover:bg-[var(--text-primary)]/[0.1]' : 'bg-black/5 text-black/70 hover:bg-black/10')}`}
+                                                        className={`flex items-center px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${idea.is_used ? (isDefault ? 'bg-green-50 text-green-600 dark:bg-green-500/10 dark:text-green-400' : 'bg-black/10 text-gray-900') : (isDefault ? 'bg-ink/[0.06] text-ink-muted hover:bg-ink/[0.1]' : 'bg-black/5 text-black/70 hover:bg-black/10')}`}
                                                     >
                                                         {idea.is_used && <Check className="mr-1.5 h-3.5 w-3.5" />}
-                                                        {idea.is_used ? 'Used' : 'Mark used'}
+                                                        {idea.is_used ? 'used' : 'mark used'}
                                                     </button>
 
                                                     {idea.isDeleting ? (
                                                         <div className={`flex items-center gap-2 text-xs font-medium border rounded-xl px-3 py-2 ${isDefault ? 'bg-red-50 border-red-100 dark:bg-red-500/10 dark:border-red-500/20' : 'bg-red-500/20 border-red-500/30'}`}>
-                                                            <button onClick={() => confirmDelete(idea.id)} className={`${isDefault ? 'text-red-600 dark:text-red-400' : 'text-red-900'} hover:underline`}>Confirm</button>
-                                                            <span className={isDefault ? 'text-gray-300 dark:text-gray-600' : 'text-black/20'}>/</span>
-                                                            <button onClick={() => setIdeas(prev => prev.map(i => i.id === idea.id ? { ...i, isDeleting: false } : i))} className={`${isDefault ? 'text-gray-600 dark:text-gray-400' : 'text-black/60'} hover:underline`}>Cancel</button>
+                                                            <button onClick={() => confirmDelete(idea.id)} className={`${isDefault ? 'text-red-600 dark:text-red-400' : 'text-red-900'} hover:underline`}>confirm</button>
+                                                            <span className={isDefault ? 'text-ink-faint' : 'text-black/20'}>/</span>
+                                                            <button onClick={() => setIdeas(prev => prev.map(i => i.id === idea.id ? { ...i, isDeleting: false } : i))} className={`${isDefault ? 'text-ink-muted' : 'text-black/60'} hover:underline`}>cancel</button>
                                                         </div>
                                                     ) : (
                                                         <button
                                                             onClick={() => setIdeas(prev => prev.map(i => i.id === idea.id ? { ...i, isDeleting: true } : i))}
-                                                            className={`rounded-xl p-2 transition-colors ${isDefault ? 'text-gray-400 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-500/10' : 'text-black/40 hover:bg-black/10 hover:text-red-700'}`}
+                                                            className={`rounded-xl p-2 transition-colors ${isDefault ? 'text-ink-faint hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-500/10' : 'text-black/40 hover:bg-black/10 hover:text-red-700'}`}
                                                         >
                                                             <Trash2 className="h-4 w-4" />
                                                         </button>
@@ -793,7 +793,7 @@ export default function IdeasPage() {
             {/* Toasts overlay */}
             <div className="fixed bottom-6 right-6 flex flex-col gap-2 z-50 pointer-events-none">
                 {toasts.map(toast => (
-                    <div key={toast.id} className="bg-gray-900 text-white px-4 py-3 rounded-xl shadow-xl text-sm font-medium animate-in slide-in-from-bottom-5 fade-in pointer-events-auto flex items-center font-ui">
+                    <div key={toast.id} className="bg-ink text-paper px-4 py-3 rounded-xl shadow-xl text-sm font-medium animate-in slide-in-from-bottom-5 fade-in pointer-events-auto flex items-center">
                         {toast.message}
                     </div>
                 ))}

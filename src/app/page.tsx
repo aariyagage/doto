@@ -18,13 +18,13 @@ export default function Home() {
                         href="/login"
                         className="px-4 py-2 text-body-sm text-ink-muted hover:text-ink transition-colors"
                     >
-                        Log in
+                        log in
                     </Link>
                     <Link
                         href="/signup"
                         className="ml-2 px-5 py-2 rounded-full bg-ink text-paper text-body-sm font-medium hover:bg-ink/90 transition-colors"
                     >
-                        Get started
+                        get started
                     </Link>
                 </div>
             </nav>
@@ -32,22 +32,22 @@ export default function Home() {
             {/* Hero */}
             <section className="max-w-5xl mx-auto px-6 md:px-10 pt-16 pb-20 md:pt-28 md:pb-28">
                 <div className="text-caption text-ink-muted mb-8">
-                    A creator&rsquo;s content workspace
+                    a creator&rsquo;s content workspace
                 </div>
                 <HeroHeadline />
                 <p className="mt-8 text-body-lg text-ink-muted max-w-2xl text-pretty">
-                    Upload your videos. We transcribe them, surface your content pillars, and draft new ideas in your exact voice — filed and ready when you need them.
+                    upload your videos. we transcribe them, surface your content pillars, and draft new ideas in your exact voice — filed and ready when you need them.
                 </p>
                 <div className="mt-10 flex flex-wrap items-center gap-x-5 gap-y-3">
                     <Link
                         href="/signup"
                         className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-ink text-paper text-body font-medium hover:bg-ink/90 transition-colors"
                     >
-                        Open your workspace
+                        open your workspace
                         <ArrowUpRight className="w-4 h-4" strokeWidth={1.75} />
                     </Link>
                     <span className="text-body-sm text-ink-faint">
-                        No credit card required.
+                        no credit card required.
                     </span>
                 </div>
             </section>
@@ -66,18 +66,18 @@ export default function Home() {
                 <div className="border-t border-rule pt-12 md:pt-16 flex flex-col md:flex-row md:items-end md:justify-between gap-8">
                     <div>
                         <h2 className="text-display-2 text-ink">
-                            Stop starting<br />
+                            stop starting<br />
                             from scratch.
                         </h2>
                         <p className="mt-5 text-body-lg text-ink-muted max-w-md">
-                            Your workspace is already full of material. doto files it for you.
+                            your workspace is already full of material. doto files it for you.
                         </p>
                     </div>
                     <Link
                         href="/signup"
                         className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-ink text-paper text-body font-medium hover:bg-ink/90 transition-colors whitespace-nowrap self-start md:self-auto"
                     >
-                        Start filing
+                        start filing
                         <ArrowUpRight className="w-4 h-4" strokeWidth={1.75} />
                     </Link>
                 </div>

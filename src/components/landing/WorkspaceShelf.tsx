@@ -6,12 +6,12 @@ import Folder from '@/components/Folder'
 const EASE = [0.25, 1, 0.5, 1] as const
 
 const WORKSPACE_FOLDERS: { label: string; caption: string; index: string }[] = [
-    { label: 'Videos',      caption: 'Raw material',         index: '01' },
-    { label: 'Transcripts', caption: 'What you said',        index: '02' },
-    { label: 'Pillars',     caption: 'Recurring themes',     index: '03' },
-    { label: 'Ideas',       caption: 'Next, automatically',  index: '04' },
-    { label: 'Voice',       caption: 'Your signature DNA',   index: '05' },
-    { label: 'Library',     caption: 'Everything, sorted',   index: '06' },
+    { label: 'Videos',      caption: 'raw material',         index: '01' },
+    { label: 'Transcripts', caption: 'what you said',        index: '02' },
+    { label: 'Pillars',     caption: 'recurring themes',     index: '03' },
+    { label: 'Ideas',       caption: 'next, automatically',  index: '04' },
+    { label: 'Voice',       caption: 'your signature DNA',   index: '05' },
+    { label: 'Library',     caption: 'everything, sorted',   index: '06' },
 ]
 
 export default function WorkspaceShelf() {
@@ -19,10 +19,10 @@ export default function WorkspaceShelf() {
         <section className="max-w-6xl mx-auto px-6 md:px-10 pb-24 md:pb-32">
             <header className="flex items-baseline justify-between pb-6 mb-12 md:mb-16 border-b border-rule">
                 <h2 className="text-display-3 text-ink">
-                    The workspace
+                    the workspace
                 </h2>
                 <span className="text-caption text-ink-muted">
-                    Six folders · One filing system
+                    six folders · one filing system
                 </span>
             </header>
 

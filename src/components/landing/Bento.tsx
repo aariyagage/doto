@@ -129,7 +129,7 @@ function VoiceQuote() {
                 &ldquo;I don&rsquo;t believe in productivity hacks. I believe in showing up tired and doing it anyway.&rdquo;
             </p>
             <span className="mt-6 text-caption text-ink-faint">
-                Inferred from your transcripts
+                inferred from your transcripts
             </span>
         </div>
     )
@@ -188,10 +188,10 @@ export default function Bento() {
         <section className="max-w-6xl mx-auto px-6 md:px-10 pb-24 md:pb-32">
             <header className="flex items-baseline justify-between pb-6 mb-12 md:mb-16 border-b border-rule">
                 <h2 className="text-display-3 text-ink">
-                    What it does for you
+                    what it does for you
                 </h2>
                 <span className="text-caption text-ink-muted">
-                    Five things, one workspace
+                    five things, one workspace
                 </span>
             </header>
 
@@ -200,16 +200,16 @@ export default function Bento() {
                 Row 2: voice (2) + ideas (2) + privacy (2) */}
             <div className="grid grid-cols-1 md:grid-cols-6 gap-4 md:gap-5">
                 <BentoTile
-                    caption="01 — Transcribe"
-                    headline="Every word, captured."
+                    caption="01 — transcribe"
+                    headline="every word, captured."
                     className="md:col-span-4 md:row-span-1 min-h-[320px]"
                 >
                     <TranscriptReveal />
                 </BentoTile>
 
                 <BentoTile
-                    caption="02 — Surface"
-                    headline="Themes, found for you."
+                    caption="02 — surface"
+                    headline="themes, found for you."
                     tab="right"
                     className="md:col-span-2 min-h-[320px]"
                 >
@@ -217,16 +217,16 @@ export default function Bento() {
                 </BentoTile>
 
                 <BentoTile
-                    caption="03 — Voice"
-                    headline="Your signature, captured."
+                    caption="03 — voice"
+                    headline="your signature, captured."
                     className="md:col-span-2 min-h-[260px]"
                 >
                     <VoiceQuote />
                 </BentoTile>
 
                 <BentoTile
-                    caption="04 — Draft"
-                    headline="Ideas, filed."
+                    caption="04 — draft"
+                    headline="ideas, filed."
                     tab="right"
                     className="md:col-span-2 min-h-[260px]"
                 >
@@ -234,8 +234,8 @@ export default function Bento() {
                 </BentoTile>
 
                 <BentoTile
-                    caption="05 — Private"
-                    headline="Videos, deleted."
+                    caption="05 — private"
+                    headline="videos, deleted."
                     className="md:col-span-2 min-h-[260px]"
                 >
                     <PrivacyBlurb />

@@ -40,19 +40,19 @@ export default function LoginPage() {
     }
 
     return (
-        <div className="flex min-h-screen flex-col items-center justify-center bg-[var(--bg-primary)] p-4">
-            <Link href="/" className="font-semibold text-3xl tracking-tight mb-6 text-[var(--text-primary)] hover:opacity-80 transition-opacity">
+        <div className="flex min-h-screen flex-col items-center justify-center bg-paper p-4">
+            <Link href="/" className="font-semibold text-3xl tracking-tight mb-6 text-ink hover:opacity-80 transition-opacity">
                 doto
             </Link>
-            <Card className="w-full max-w-md bg-[var(--bg-panel)] border-[var(--border-manila)] shadow-sm rounded-2xl">
+            <Card className="w-full max-w-md bg-paper-elevated border-rule shadow-sm rounded-2xl">
                 <CardHeader>
-                    <CardTitle className="text-2xl font-semibold tracking-tight">Welcome back</CardTitle>
-                    <CardDescription>Sign in to your account.</CardDescription>
+                    <CardTitle className="text-2xl font-semibold tracking-tight">welcome back</CardTitle>
+                    <CardDescription>sign in to your account.</CardDescription>
                 </CardHeader>
                 <CardContent>
                     <form onSubmit={handleSubmit} className="space-y-4">
                         <div className="space-y-2">
-                            <Label htmlFor="email">Email</Label>
+                            <Label htmlFor="email">email</Label>
                             <Input
                                 id="email"
                                 type="email"
@@ -63,7 +63,7 @@ export default function LoginPage() {
                             />
                         </div>
                         <div className="space-y-2">
-                            <Label htmlFor="password">Password</Label>
+                            <Label htmlFor="password">password</Label>
                             <div className="relative">
                                 <Input
                                     id="password"
@@ -77,9 +77,9 @@ export default function LoginPage() {
                                 <button
                                     type="button"
                                     onClick={() => setShowPassword(v => !v)}
-                                    aria-label={showPassword ? 'Hide password' : 'Show password'}
+                                    aria-label={showPassword ? 'hide password' : 'show password'}
                                     aria-pressed={showPassword}
-                                    className="absolute inset-y-0 right-0 flex items-center px-3 text-[var(--text-primary)]/50 hover:text-[var(--text-primary)] transition-colors"
+                                    className="absolute inset-y-0 right-0 flex items-center px-3 text-ink-muted hover:text-ink transition-colors"
                                 >
                                     {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                                 </button>
@@ -88,16 +88,16 @@ export default function LoginPage() {
                         {error && <p role="alert" className="text-sm text-[var(--combo-6-bg)] font-medium">{error}</p>}
                         <Button
                             type="submit"
-                            className="w-full rounded-full bg-[var(--text-primary)] text-[var(--bg-primary)] hover:opacity-90 transition-opacity font-medium h-11"
+                            className="w-full rounded-full bg-ink text-paper hover:bg-ink/90 transition-colors font-medium h-11"
                             disabled={loading}
                         >
-                            {loading ? 'Signing in…' : 'Log in'}
+                            {loading ? 'signing in…' : 'log in'}
                         </Button>
                     </form>
                 </CardContent>
                 <CardFooter className="flex justify-center">
-                    <Link href="/signup" className="text-sm text-[var(--muted-foreground)] hover:text-[var(--text-primary)] transition-colors">
-                        Don&apos;t have an account? <span className="underline underline-offset-4">Sign up</span>
+                    <Link href="/signup" className="text-sm text-ink-muted hover:text-ink transition-colors">
+                        don&apos;t have an account? <span className="underline underline-offset-4">sign up</span>
                     </Link>
                 </CardFooter>
             </Card>

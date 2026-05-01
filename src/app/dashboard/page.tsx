@@ -87,22 +87,22 @@ export default function DashboardPage() {
                         {/* Header */}
                         <div className="flex items-center justify-between mb-8">
                             <div>
-                                <h1 className="text-3xl md:text-[34px] font-semibold tracking-tight text-[var(--text-primary)]">Your voice</h1>
-                                <p className="text-base text-[var(--text-primary)]/60 mt-2">Here&rsquo;s your content engine overview.</p>
+                                <h1 className="text-title-1 text-ink">your voice</h1>
+                                <p className="text-body-sm text-ink-muted mt-2">here&rsquo;s your content engine overview.</p>
                             </div>
                             <LogoutButton />
                         </div>
 
                         {isLoading ? (
                             <div className="flex flex-col items-center justify-center py-24 text-center">
-                                <Loader2 className="h-8 w-8 animate-spin text-[var(--text-primary)]/30" />
-                                <p className="text-sm text-[var(--text-primary)]/60 mt-4">Loading insights...</p>
+                                <Loader2 className="h-8 w-8 animate-spin text-ink-faint" />
+                                <p className="text-body-sm text-ink-muted mt-4">loading insights...</p>
                             </div>
                         ) : !stats ? (
-                            <div className="flex flex-col items-center justify-center py-24 text-center border-2 border-dashed border-[var(--text-primary)]/10 rounded-3xl bg-[var(--bg-panel)]">
-                                <Home className="h-10 w-10 text-[var(--text-primary)]/30 mb-4" />
-                                <h3 className="text-xl font-semibold tracking-tight text-[var(--text-primary)] mb-2">No data yet</h3>
-                                <p className="text-base text-[var(--text-primary)]/60 mb-6 max-w-sm mx-auto">Upload your first video to start generating insights and pillars.</p>
+                            <div className="flex flex-col items-center justify-center py-24 text-center border-2 border-dashed border-rule rounded-3xl bg-paper-elevated">
+                                <Home className="h-10 w-10 text-ink-faint mb-4" />
+                                <h3 className="text-title-3 text-ink mb-2">no data yet</h3>
+                                <p className="text-body-sm text-ink-muted mb-6 max-w-sm mx-auto">upload your first video to start generating insights and pillars.</p>
                             </div>
                         ) : (
                             <div className="space-y-8 animate-in fade-in duration-500">
@@ -110,21 +110,21 @@ export default function DashboardPage() {
                                 {/* Stat cards */}
                                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                                     {[
-                                        { label: 'Videos', sub: 'Processed', value: stats.metrics.totalVideos, color: 'var(--combo-9-bg)' },
-                                        { label: 'Ideas', sub: 'Generated', value: stats.metrics.totalIdeas, color: 'var(--combo-5-bg)' },
-                                        { label: 'Pillars', sub: 'Identified', value: stats.metrics.totalPillars, color: 'var(--combo-3-bg)' },
-                                        { label: 'Saved', sub: 'Bookmarked', value: stats.metrics.totalSavedIdeas, color: 'var(--combo-1-bg)' },
+                                        { label: 'videos', sub: 'processed', value: stats.metrics.totalVideos, color: 'var(--combo-9-bg)' },
+                                        { label: 'ideas', sub: 'generated', value: stats.metrics.totalIdeas, color: 'var(--combo-5-bg)' },
+                                        { label: 'pillars', sub: 'identified', value: stats.metrics.totalPillars, color: 'var(--combo-3-bg)' },
+                                        { label: 'saved', sub: 'bookmarked', value: stats.metrics.totalSavedIdeas, color: 'var(--combo-1-bg)' },
                                     ].map((m) => (
-                                        <div key={m.label} className="rounded-2xl border border-[var(--border-manila)] bg-[var(--bg-panel)] p-5">
+                                        <div key={m.label} className="rounded-2xl border border-rule bg-paper-elevated p-5">
                                             <div className="flex items-baseline gap-2">
-                                                <span className="text-3xl md:text-4xl font-semibold tracking-tight tabular-nums text-[var(--text-primary)]">
+                                                <span className="text-3xl md:text-4xl font-semibold tracking-tight tabular-nums text-ink">
                                                     {m.value}
                                                 </span>
                                                 <span className="h-2 w-2 rounded-full" style={{ backgroundColor: m.color }} aria-hidden="true" />
                                             </div>
                                             <div className="mt-3 flex flex-col">
-                                                <span className="text-sm font-medium text-[var(--text-primary)]">{m.label}</span>
-                                                <span className="text-xs text-[var(--text-primary)]/50 mt-0.5">{m.sub}</span>
+                                                <span className="text-sm font-medium text-ink">{m.label}</span>
+                                                <span className="text-xs text-ink-faint mt-0.5">{m.sub}</span>
                                             </div>
                                         </div>
                                     ))}
@@ -132,9 +132,9 @@ export default function DashboardPage() {
 
                                 {/* Main Chart Area */}
                                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                                    <div className="lg:col-span-2 bg-[var(--bg-panel)] border border-[var(--border-manila)] rounded-2xl p-6">
-                                        <h3 className="text-base font-semibold tracking-tight text-[var(--text-primary)] mb-6 flex items-center gap-2">
-                                            Content pipeline distribution
+                                    <div className="lg:col-span-2 bg-paper-elevated border border-rule rounded-2xl p-6">
+                                        <h3 className="text-title-3 text-ink mb-6 flex items-center gap-2">
+                                            content pipeline distribution
                                         </h3>
                                         <div className="h-80 w-full">
                                             {stats.chartData.length > 0 ? (
@@ -160,25 +160,25 @@ export default function DashboardPage() {
                                                             itemStyle={{ color: tooltipText }}
                                                         />
                                                         <Legend iconType="circle" wrapperStyle={{ paddingTop: '20px', fontSize: '12px', color: tickColor }} />
-                                                        <Bar dataKey="ideas" name="Ideas Generated" radius={[4, 4, 0, 0]} maxBarSize={40}>
+                                                        <Bar dataKey="ideas" name="ideas generated" radius={[4, 4, 0, 0]} maxBarSize={40}>
                                                             {stats.chartData.map((entry, index) => (
                                                                 <Cell key={`cell-ideas-${index}`} fill={entry.color} />
                                                             ))}
                                                         </Bar>
-                                                        <Bar dataKey="videos" name="Videos Uploaded" fill={videosBarColor} radius={[4, 4, 0, 0]} maxBarSize={40} />
+                                                        <Bar dataKey="videos" name="videos uploaded" fill={videosBarColor} radius={[4, 4, 0, 0]} maxBarSize={40} />
                                                     </BarChart>
                                                 </ResponsiveContainer>
                                             ) : (
-                                                <div className="h-full w-full flex items-center justify-center text-[var(--text-primary)]/40 text-sm">
-                                                    Not enough data to generate chart.
+                                                <div className="h-full w-full flex items-center justify-center text-ink-faint text-sm">
+                                                    not enough data to generate chart.
                                                 </div>
                                             )}
                                         </div>
                                     </div>
 
                                     {/* Recent Activity */}
-                                    <div className="bg-[var(--bg-panel)] border border-[var(--border-manila)] rounded-2xl p-6 flex flex-col">
-                                        <h3 className="text-base font-semibold tracking-tight text-[var(--text-primary)] mb-6">Recent activity</h3>
+                                    <div className="bg-paper-elevated border border-rule rounded-2xl p-6 flex flex-col">
+                                        <h3 className="text-title-3 text-ink mb-6">recent activity</h3>
                                         <div className="flex-1 space-y-4">
                                             {stats.recentActivity.length > 0 ? (
                                                 stats.recentActivity.map((activity, idx) => (
@@ -200,24 +200,24 @@ export default function DashboardPage() {
                                                                 </div>
                                                             )}
                                                         </div>
-                                                        <div className="overflow-hidden flex-1 border-b border-[var(--text-primary)]/5 pb-4">
-                                                            <div className="font-semibold text-[var(--text-primary)] text-sm truncate">
+                                                        <div className="overflow-hidden flex-1 border-b border-rule-soft pb-4">
+                                                            <div className="font-semibold text-ink text-sm truncate">
                                                                 {activity.title}
                                                             </div>
-                                                            <div className="text-[var(--text-primary)]/50 text-xs mt-0.5 font-medium">
-                                                                {activity.type === 'video' ? 'Processed' : 'Generated'} · {new Date(activity.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                                                            <div className="text-ink-faint text-xs mt-0.5 font-medium">
+                                                                {activity.type === 'video' ? 'processed' : 'generated'} · {new Date(activity.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
                                                             </div>
                                                         </div>
                                                     </div>
                                                 ))
                                             ) : (
-                                                <div className="text-center text-[var(--text-primary)]/40 text-sm py-10">
-                                                    No recent activity found.
+                                                <div className="text-center text-ink-faint text-sm py-10">
+                                                    no recent activity found.
                                                 </div>
                                             )}
                                         </div>
-                                        <Link href="/videos" className="mt-4 flex items-center justify-center gap-1.5 w-full py-2.5 text-sm font-semibold text-[var(--text-primary)] bg-[var(--text-primary)]/5 hover:bg-[var(--text-primary)]/10 rounded-xl transition-colors">
-                                            View Library <ArrowUpRight className="h-4 w-4 opacity-50" />
+                                        <Link href="/videos" className="mt-4 flex items-center justify-center gap-1.5 w-full py-2.5 text-sm font-semibold text-ink bg-ink/5 hover:bg-ink/10 rounded-xl transition-colors">
+                                            view library <ArrowUpRight className="h-4 w-4 opacity-50" />
                                         </Link>
                                     </div>
                                 </div>

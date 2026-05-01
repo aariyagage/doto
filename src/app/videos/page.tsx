@@ -131,12 +131,12 @@ export default function VideoLibraryPage() {
                     <div className="w-full max-w-7xl mx-auto space-y-8">
                         {/* Top Bar */}
                         <div className="flex items-center justify-between mb-8">
-                            <h1 className="text-3xl md:text-[34px] font-semibold tracking-tight text-[var(--text-primary)]">Library</h1>
+                            <h1 className="text-title-1 text-ink">library</h1>
                             <Link href="/upload">
                                 <Button
-                                    className="bg-[var(--text-primary)] text-[var(--bg-primary)] hover:opacity-90 transition-opacity rounded-full px-5 h-10 font-medium"
+                                    className="bg-ink text-paper hover:bg-ink/90 transition-colors rounded-full px-5 h-10 font-medium"
                                 >
-                                    Upload video
+                                    upload video
                                 </Button>
                             </Link>
                         </div>
@@ -152,13 +152,13 @@ export default function VideoLibraryPage() {
                             {!isLoading && transcripts.length === 0 && (
                                 <div className="col-span-full flex flex-col items-center justify-center py-16 md:py-24 text-center">
                                     <Folder color="var(--combo-3-bg)" size="sm" />
-                                    <h3 className="text-xl font-semibold tracking-tight text-[var(--text-primary)] mt-6 mb-2">An empty shelf</h3>
-                                    <p className="text-base text-[var(--text-primary)]/60 mb-6 max-w-sm">
-                                        Upload a video to start filling your library. We&rsquo;ll transcribe it, tag it to a pillar, and file it here.
+                                    <h3 className="text-title-3 text-ink mt-6 mb-2">an empty shelf</h3>
+                                    <p className="text-body-sm text-ink-muted mb-6 max-w-sm">
+                                        upload a video to start filling your library. we&rsquo;ll transcribe it, tag it to a pillar, and file it here.
                                     </p>
                                     <Link href="/upload">
-                                        <Button className="bg-[var(--text-primary)] text-[var(--bg-primary)] rounded-full px-6 hover:opacity-90 transition-opacity font-medium">
-                                            Upload your first video
+                                        <Button className="bg-ink text-paper rounded-full px-6 hover:bg-ink/90 transition-colors font-medium">
+                                            upload your first video
                                         </Button>
                                     </Link>
                                 </div>
@@ -168,9 +168,9 @@ export default function VideoLibraryPage() {
                                 const mainColor = transcript.attachedPillars?.[0]?.color || '#9ca3af';
 
                                 return (
-                                    <div key={transcript.id} className="relative flex flex-col rounded-2xl border border-[var(--border-manila)] bg-[var(--bg-panel)] shadow-sm hover:shadow-md hover:border-[var(--text-primary)]/15 transition-all">
+                                    <div key={transcript.id} className="relative flex flex-col rounded-2xl border border-rule bg-paper-elevated shadow-sm hover:shadow-md hover:border-ink/15 transition-all">
                                         {/* Folder cover */}
-                                        <div className="w-full flex items-end justify-center pt-6 pb-3 px-5 bg-[var(--text-primary)]/[0.02] border-b border-[var(--border-manila)] rounded-t-2xl">
+                                        <div className="w-full flex items-end justify-center pt-6 pb-3 px-5 bg-ink/[0.02] border-b border-rule rounded-t-2xl">
                                             <Folder
                                                 color={mainColor}
                                                 index={(transcript.videos?.file_name || 'V').trim().charAt(0).toUpperCase()}
@@ -181,8 +181,8 @@ export default function VideoLibraryPage() {
                                         <div className="p-5 flex flex-col flex-1">
                                             <div className="flex items-start justify-between mb-3">
                                                 <div className="flex flex-col">
-                                                    <h2 className="text-base font-semibold tracking-tight text-[var(--text-primary)] truncate max-w-[200px] mb-2" title={transcript.videos?.file_name}>
-                                                        {transcript.videos?.file_name || 'Untitled video'}
+                                                    <h2 className="text-base font-semibold tracking-tight text-ink truncate max-w-[200px] mb-2" title={transcript.videos?.file_name}>
+                                                        {transcript.videos?.file_name || 'untitled video'}
                                                     </h2>
 
                                                     {/* Pillar Tags */}
@@ -209,8 +209,8 @@ export default function VideoLibraryPage() {
                                                         </div>
                                                     ) : (
                                                         <div className="flex mb-2">
-                                                            <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium text-[var(--text-primary)]/60 bg-[var(--text-primary)]/[0.06]">
-                                                                Uncategorized
+                                                            <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium text-ink-muted bg-ink/[0.06]">
+                                                                uncategorized
                                                             </span>
                                                         </div>
                                                     )}
@@ -219,18 +219,18 @@ export default function VideoLibraryPage() {
                                                 {/* Action */}
                                                 <div className="flex items-center gap-2 relative z-20">
                                                     {transcript.isDeleting ? (
-                                                        <div className="absolute right-0 top-0 bg-[var(--bg-panel)] shadow-xl border border-[var(--border-manila)] rounded-xl p-3 flex flex-col gap-2 min-w-[220px]">
-                                                            <span className="text-[11px] font-medium text-[var(--text-primary)]/50 text-center">Delete options</span>
+                                                        <div className="absolute right-0 top-0 bg-paper-elevated shadow-xl border border-rule rounded-xl p-3 flex flex-col gap-2 min-w-[220px]">
+                                                            <span className="text-[11px] font-medium text-ink-muted text-center">delete options</span>
                                                             <button
                                                                 onClick={() => confirmDelete(transcript.id, 'soft')}
-                                                                className="text-xs font-medium border rounded-lg px-2 py-2 bg-[var(--text-primary)]/[0.04] border-[var(--border-manila)] text-[var(--text-primary)] hover:bg-[var(--text-primary)]/[0.06] transition-colors"
+                                                                className="text-xs font-medium border rounded-lg px-2 py-2 bg-ink/[0.04] border-rule text-ink hover:bg-ink/[0.06] transition-colors"
                                                             >
-                                                                Hide from library
-                                                                <span className="block text-[10px] font-normal text-[var(--text-primary)]/50 mt-0.5">Transcript stays for voice profile</span>
+                                                                hide from library
+                                                                <span className="block text-[10px] font-normal text-ink-muted mt-0.5">transcript stays for voice profile</span>
                                                             </button>
-                                                            <div className="border-t border-[var(--border-manila)] pt-2">
+                                                            <div className="border-t border-rule pt-2">
                                                                 <p className="text-[11px] text-[var(--combo-6-bg)] font-medium mb-1.5 px-1">
-                                                                    Permanent delete removes the video, transcript, and ideas. This cannot be undone.
+                                                                    permanent delete removes the video, transcript, and ideas. this cannot be undone.
                                                                 </p>
                                                                 <button
                                                                     onClick={() => {
@@ -245,14 +245,14 @@ export default function VideoLibraryPage() {
                                                                         : 'bg-[var(--combo-6-bg)]/10 border-[var(--combo-6-bg)]/30 text-[var(--combo-6-bg)] hover:bg-[var(--combo-6-bg)]/20'
                                                                     }`}
                                                                 >
-                                                                    {transcript.hardDeleteArmed ? 'Click again to permanently delete' : 'Delete permanently'}
+                                                                    {transcript.hardDeleteArmed ? 'click again to permanently delete' : 'delete permanently'}
                                                                 </button>
                                                             </div>
                                                             <button
                                                                 onClick={() => setTranscripts(prev => prev.map(t => t.id === transcript.id ? { ...t, isDeleting: false, hardDeleteArmed: false } : t))}
-                                                                className="text-xs font-medium text-[var(--text-primary)]/50 hover:text-[var(--text-primary)] pt-1"
+                                                                className="text-xs font-medium text-ink-muted hover:text-ink pt-1"
                                                             >
-                                                                Cancel
+                                                                cancel
                                                             </button>
                                                         </div>
                                                     ) : (
@@ -264,14 +264,14 @@ export default function VideoLibraryPage() {
                                                                 }}
                                                                 aria-label={`Declare ${transcript.videos?.file_name || 'video'} as part of a series`}
                                                                 title="Declare as series"
-                                                                className="rounded-full p-2 text-[var(--text-primary)]/40 transition-colors hover:bg-blue-500/10 hover:text-blue-600"
+                                                                className="rounded-full p-2 text-ink-faint transition-colors hover:bg-blue-500/10 hover:text-blue-600"
                                                             >
                                                                 <Layers className="h-4 w-4" />
                                                             </button>
                                                             <button
                                                                 onClick={() => setTranscripts(prev => prev.map(t => t.id === transcript.id ? { ...t, isDeleting: true } : t))}
                                                                 aria-label={`Delete ${transcript.videos?.file_name || 'video'}`}
-                                                                className="rounded-full p-2 text-[var(--text-primary)]/40 transition-colors hover:bg-[var(--combo-6-bg)]/10 hover:text-[var(--combo-6-bg)]"
+                                                                className="rounded-full p-2 text-ink-faint transition-colors hover:bg-[var(--combo-6-bg)]/10 hover:text-[var(--combo-6-bg)]"
                                                             >
                                                                 <Trash2 className="h-4 w-4" />
                                                             </button>
@@ -281,18 +281,18 @@ export default function VideoLibraryPage() {
                                             </div>
 
                                             {/* Transcript Text Preview */}
-                                            <div className="bg-[var(--text-primary)]/[0.03] rounded-lg p-3 max-h-[100px] overflow-hidden relative mt-auto border border-[var(--border-manila)]">
-                                                <div className="absolute bottom-0 left-0 right-0 h-10 bg-gradient-to-t from-[var(--bg-panel)] to-transparent pointer-events-none"></div>
-                                                <p className="text-xs text-[var(--text-primary)]/60 leading-relaxed">
+                                            <div className="bg-ink/[0.03] rounded-lg p-3 max-h-[100px] overflow-hidden relative mt-auto border border-rule">
+                                                <div className="absolute bottom-0 left-0 right-0 h-10 bg-gradient-to-t from-paper-elevated to-transparent pointer-events-none"></div>
+                                                <p className="text-xs text-ink-muted leading-relaxed">
                                                     {transcript.raw_text}
                                                 </p>
                                             </div>
 
-                                            <div className="mt-4 flex items-center justify-between text-[11px] text-[var(--text-primary)]/55 font-medium border-t border-[var(--border-manila)] pt-3">
+                                            <div className="mt-4 flex items-center justify-between text-[11px] text-ink-muted font-medium border-t border-rule pt-3">
                                                 <span className="flex items-center gap-1.5"><Calendar className="h-3 w-3" /> {new Date(transcript.created_at).toLocaleDateString()}</span>
                                                 <span className="flex items-center gap-1.5">
                                                     <span className="h-2 w-2 rounded-full" style={{ backgroundColor: mainColor }} aria-hidden="true" />
-                                                    Analyzed
+                                                    analyzed
                                                 </span>
                                             </div>
                                         </div>

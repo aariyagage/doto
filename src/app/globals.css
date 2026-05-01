@@ -169,6 +169,14 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   transition: background-color 0.2s, color 0.2s;
+  text-transform: lowercase;
+}
+
+/* Form controls keep their original case so users can read what they type
+ * (especially passwords/emails). The lowercase transform is a display rule
+ * for content, not user input. */
+input, textarea, select, [contenteditable] {
+  text-transform: none;
 }
 
 /* Display headlines — system-first sans, tightened for large sizes.
@@ -214,7 +222,6 @@ body {
   line-height: 1.4;
   font-weight: 500;
   letter-spacing: 0.16em;
-  text-transform: uppercase;
 }
 
 /* Default heading typography — also system-first. SF Pro Display kicks in

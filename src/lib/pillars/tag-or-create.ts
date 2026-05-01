@@ -1,6 +1,7 @@
 import type Groq from 'groq-sdk';
-import { parseEmbedding } from './embeddings';
-import { findSimilarPillars, type PillarMatch } from './dedup';
+import { embedText, parseEmbedding } from './embeddings';
+import { findSimilarPillars, findClosestPillar, PILLAR_DEDUP_COSINE_THRESHOLD, type PillarMatch } from './dedup';
+import { getCombo } from '@/lib/colors';
 import type { SupabaseServer } from './types';
 
 // Cosine thresholds. With BROAD pillars, same-territory essences typically
@@ -25,8 +26,10 @@ interface TagOrCreateArgs {
 }
 
 interface LlmTagDecision {
-    decision: 'tag' | 'skip';
+    decision: 'tag' | 'new';
     pillar_name?: string;
+    name?: string;
+    description?: string;
     subtopic?: string;
 }
 
@@ -50,30 +53,43 @@ async function decideTagOrCreate(
         messages: [
             {
                 role: 'system',
-                content: `You sort a new video into one of a creator's existing content pillars. You CANNOT propose a new pillar — that's a separate user-driven flow. Your only choices are "tag" (the video fits an existing pillar well enough) or "skip" (it doesn't fit any of them well enough; leave it Uncategorized).
+                content: `You decide which content pillar (folder) a new video belongs in. Either it fits an existing pillar (tag it there) or it's a genuinely different domain (create a new pillar with a BROAD name).
 
-CRITICAL: STRONG bias toward reuse. Your default answer is "tag" if any existing pillar is a reasonable home, even if the fit is loose.
+CRITICAL: STRONG bias toward reuse. Default to "tag" if any existing pillar is a reasonable home — even if the fit is loose. Only propose "new" when the video's domain is fundamentally different from EVERY existing pillar.
 
-Examples of CORRECT reuse:
+Examples of CORRECT reuse (these MUST tag, never create new):
 - existing "Productivity" + video about "time blocking" → tag to Productivity
 - existing "Productivity" + video about "morning routine" → tag to Productivity
+- existing "Productivity" + video about "life maxxing" → tag to Productivity
 - existing "Beauty" + video about "lipstick swatches" → tag to Beauty
+- existing "Beauty" + video about "skincare routine" → tag to Beauty
 - existing "Daily Life" + video about "a day in college" → tag to Daily Life
+- existing "Daily Life" + video about "study routine" → tag to Daily Life
 - existing "Daily Life" + video about "weekend in the city" → tag to Daily Life
 - existing "Founder Diaries" + video about "pricing experiment" → tag to Founder Diaries
 
-Examples where "skip" is correct (genuinely doesn't belong to any existing pillar):
-- only "Productivity" exists + video about "Q1 revenue review" → skip (it's a founder video; user will run Discover Pillars to get a Founder pillar)
-- only "Beauty" exists + video about "budget meal prep" → skip (cooking has no home here)
+Examples where "new" is correct (genuinely different domain):
+- only "Productivity" exists + video about "budget meal prep" → new "Cooking" or "Food"
+- only "Beauty" exists + video about "Q1 revenue review" → new "Founder Diaries"
+- only "Vlogs" exists + video about "AI and originality" → new "Cultural Commentary"
+- (no pillars exist yet) + ANY video → new (use a broad name like "Vlogs", "Productivity", "Cultural Commentary")
 
-When proposing "tag", also extract the specific subtopic this video covers (1-3 words, e.g. "time blocking", "college life", "female voices online"). When proposing "skip", leave subtopic empty.
+NEW PILLAR NAMING RULES (when proposing "new"):
+- 1-3 words. Title Case. Broad enough to host future videos in the same vein.
+- ✅ "Vlogs", "Productivity", "Beauty", "Cultural Commentary", "Founder Diaries", "Daily Life", "Cooking", "Creative Thinking"
+- ❌ "College Life" (a college vlog is just "Daily Life" or "Vlogs")
+- ❌ "Female Voice" (a video discussing women's voices online is just "Cultural Commentary")
+- ❌ "Brand X Reviews" (one product mentioned doesn't justify a Brand X pillar — it's "Beauty" or "Reviews")
+- ❌ "Morning Routines" (that's a subtopic of "Productivity")
+
+When proposing "tag", also extract the specific subtopic this video covers (1-3 words, e.g. "time blocking", "college life", "female voices online"). When proposing "new", leave subtopic empty — the broad pillar can accumulate subtopics later.
 
 Return only valid JSON.`,
             },
             {
                 role: 'user',
-                content: `ALL of the creator's existing pillars (you can only tag into one of THESE — there is no "new pillar" option):
-${fullPillarList || '(none yet — return skip)'}
+                content: `ALL of the creator's existing pillars (you must tag against one of these unless the video is a fundamentally different domain):
+${fullPillarList || '(none yet — propose new with a BROAD name)'}
 
 Top semantic matches for this new video:
 ${candidatesBlock || '(no close matches)'}
@@ -84,7 +100,7 @@ ${essence}
 Return ONE of these JSON shapes:
 { "decision": "tag", "pillar_name": "<EXACT existing name>", "subtopic": "<1-3 words: the specific topic this video covers under that pillar>" }
 OR
-{ "decision": "skip" }`,
+{ "decision": "new", "name": "<1-3 words, BROAD — distinct domain from all existing>", "description": "<one sentence>" }`,
             },
         ],
     });
@@ -176,15 +192,7 @@ export async function tagOrCreatePillarsForVideo(
     const matches = await findSimilarPillars(supabase, userId, essenceEmbedding, TAG_AMBIGUOUS_FLOOR);
     const top = matches[0];
 
-    // 3. No pillars exist yet — short-circuit. The user hasn't run Discover
-    //    Pillars; we never auto-create from a single video. The video stays
-    //    Uncategorized and shows up in the next Discover run.
-    if (matches.length === 0) {
-        result.untagged = true;
-        return result;
-    }
-
-    // 4. Strong match → tag fast, no LLM call. We pass the v2-essence topic
+    // 3. Strong match → tag fast, no LLM call. We pass the v2-essence topic
     //    so subtopics still accumulate without a Groq call. Pre-v2 transcripts
     //    have no topic; appendSubtopic short-circuits cleanly on undefined.
     if (top && top.similarity >= TAG_FAST_THRESHOLD) {
@@ -202,9 +210,10 @@ export async function tagOrCreatePillarsForVideo(
         return result;
     }
 
-    // 5. Ambiguous band (0.30 ≤ cosine < 0.55). Ask the LLM to pick one of the
-    //    EXISTING pillars; we never accept "new" suggestions on the per-upload
-    //    path. Pillar creation is exclusively user-driven via Discover Pillars.
+    // 4. Ambiguous band (cosine < 0.55) OR no existing pillars at all. Ask the
+    //    LLM to pick an existing pillar OR propose a new BROAD one. The full
+    //    pillar list goes in so the LLM doesn't dupe a pillar that didn't make
+    //    the cosine top-N.
     const { data: allPillarsRaw } = await supabase
         .from('pillars')
         .select('id, name, description')
@@ -221,8 +230,7 @@ export async function tagOrCreatePillarsForVideo(
     } catch (err) {
         console.error('tag-or-create LLM decision failed:', err);
         // Fall back to cosine top match if it cleared the ambiguous floor;
-        // otherwise leave untagged. The stale-pillar nudge will surface if this
-        // keeps happening, signalling the user that they should re-Discover.
+        // otherwise leave untagged.
         if (top && top.similarity >= TAG_AMBIGUOUS_FLOOR) {
             await tagVideoToPillar(supabase, videoId, top.id, transcriptTopic);
             result.tagged.push(top.id);
@@ -242,8 +250,7 @@ export async function tagOrCreatePillarsForVideo(
             return result;
         }
         // LLM intended "tag" but spelled the pillar name wrong. Fall back to
-        // the closest cosine match if it's above the ambiguous floor — it's
-        // what the LLM clearly meant.
+        // the closest cosine match if it's above the ambiguous floor.
         if (top && top.similarity >= TAG_AMBIGUOUS_FLOOR) {
             await tagVideoToPillar(supabase, videoId, top.id, decision.subtopic || transcriptTopic);
             result.tagged.push(top.id);
@@ -251,10 +258,71 @@ export async function tagOrCreatePillarsForVideo(
         }
     }
 
-    // LLM said "new" OR no usable match returned. We do NOT honor "new" here —
-    // pillar creation is reserved for the user-triggered Discover flow, which
-    // sees ALL essences at once and can make a coherent decision instead of
-    // spawning a narrow pillar from one video. Leave untagged.
+    if (decision.decision === 'new' && decision.name && decision.description) {
+        const proposalName = decision.name.trim();
+        const proposalDesc = decision.description.trim();
+        if (!proposalName || !proposalDesc) {
+            result.untagged = true;
+            return result;
+        }
+
+        // Embed + dedup against existing pillars. Belt-and-suspenders for when
+        // the LLM ignores the "don't dupe existing pillars" instruction.
+        let proposalEmbedding: number[];
+        try {
+            proposalEmbedding = await embedText(`${proposalName}. ${proposalDesc}`);
+        } catch (err) {
+            console.error('Proposal embedding failed:', err);
+            result.untagged = true;
+            return result;
+        }
+
+        const dup = await findClosestPillar(supabase, userId, proposalEmbedding, PILLAR_DEDUP_COSINE_THRESHOLD);
+        if (dup) {
+            await tagVideoToPillar(supabase, videoId, dup.id, transcriptTopic);
+            result.tagged.push(dup.id);
+            return result;
+        }
+
+        const colorCombo = getCombo(allPillars.length);
+        const { data: inserted, error: insertErr } = await supabase
+            .from('pillars')
+            .insert({
+                user_id: userId,
+                name: proposalName,
+                description: proposalDesc,
+                embedding: proposalEmbedding,
+                subtopics: transcriptTopic ? [transcriptTopic] : [],
+                source: 'ai_detected',
+                source_origin: 'ai_detected',
+                color: colorCombo.bg,
+            })
+            .select('id')
+            .single();
+
+        let pillarId: string | null = null;
+        if (insertErr) {
+            // Race loser path: fetch by name and tag against the winner.
+            const { data: existing } = await supabase
+                .from('pillars')
+                .select('id')
+                .eq('user_id', userId)
+                .ilike('name', proposalName)
+                .maybeSingle();
+            pillarId = existing ? (existing.id as string) : null;
+        } else {
+            pillarId = inserted!.id as string;
+            result.created.push(pillarId);
+        }
+
+        if (pillarId) {
+            await tagVideoToPillar(supabase, videoId, pillarId, transcriptTopic);
+            result.tagged.push(pillarId);
+            return result;
+        }
+    }
+
+    // Nothing landed. Leaves the video untagged so the stale-pillar nudge can fire.
     result.untagged = true;
     return result;
 }

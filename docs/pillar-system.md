@@ -10,17 +10,27 @@ Pillars are the spine of the product. If they're wrong — too narrow, too overl
 
 ## The system in one paragraph
 
-When a creator uploads a video, we transcribe it once and generate a structured essence (`topic // core_idea // takeaway`) plus its embedding. **Pillars are not auto-created from uploads.** Each upload tries to file the new video into an *existing* pillar via cosine similarity (escalating to an LLM in the ambiguous band); if nothing fits well enough, the video sits Uncategorized. The creator clicks **Discover Pillars** on `/ideas` when they want to organize their library — that runs a per-video classification pass: the LLM files each video into a folder, videos that landed in the same folder become a pillar, and the whole set gets persisted. Series are detected via a regex pre-filter + confirming LLM call on every upload — series pillars *are* allowed to auto-create because they respond to an explicit signal in the transcript ("welcome to my series"), not LLM guessing. The creator can also manually declare series. The same Discover button doubles as Regenerate when pillars already exist (preserves user-declared and series pillars).
+When a creator uploads a video, we transcribe it once and generate a structured essence (`topic // core_idea // takeaway`) plus its embedding. The video then runs through `tagOrCreatePillarsForVideo`: cosine match against existing pillars first, then LLM escalation in the ambiguous band. The LLM either files the video into an existing pillar or **proposes a new BROAD pillar** (e.g. "Vlogs", "Productivity", "Cultural Commentary") with embedding dedup at 0.78 to prevent near-duplicate pillars. Series are detected via a regex pre-filter + confirming LLM call. The creator can also manually declare series. A **Regenerate / Discover Pillars** button on `/ideas` re-derives the entire pillar set from scratch using per-video classification across all essences — useful for cleanup or when the creator's content has drifted.
 
 ## Lifecycle
 
-### 1. Pre-discovery (any number of transcripts, no Discover yet)
+### 1. Per-upload tag-or-create
 
-Every upload sits Uncategorized. `tagOrCreatePillarsForVideo` runs but no-ops because there are no existing pillars to sort into. The `/ideas` page surfaces a "Discover Pillars" button as soon as the user has ≥1 video. **Series detection still runs** on every upload — if a video looks like a series episode, the series pillar gets created and the video tagged into it, even pre-discovery.
+Every video runs through `tagOrCreatePillarsForVideo`:
 
-### 2. Discover (user-triggered)
+| Cosine similarity (top match) | Action |
+| --- | --- |
+| ≥ 0.55 | Fast tag into the matching pillar, no LLM call. Multi-tag if a second pillar also scores ≥ 0.72 AND is within 0.05 of top-1. |
+| 0.30 – 0.55 | LLM decides: tag into one of the existing pillars OR propose a new pillar with a BROAD name. |
+| < 0.30 | LLM proposes a new pillar (since no existing pillar fits). New proposals go through the 0.78 embedding-dedup gate to catch near-duplicates of pillars that didn't make the cosine top-N. |
 
-The user clicks **Discover Pillars** on `/ideas`. `regeneratePillarsForUser` runs:
+The LLM call always sees the **full pillar list** with descriptions, not just cosine top-N — this catches duplicates of pillars that the cosine query missed. The prompt has strong reuse bias: "Default to tag if any existing pillar is a reasonable home." When proposing new, names must be 1-3 words BROAD ("Vlogs", "Productivity", "Cultural Commentary") — never narrow qualifiers ("College Life", "Female Voice", "Brand X Reviews").
+
+The first upload always proposes a new pillar (no existing ones to match against). Each subsequent video either joins an existing pillar or creates a new one with its own broad name. There is no "bootstrap moment" that forces 2 unrelated videos into one umbrella — that was the failure mode of the previous design.
+
+### 2. Discover / Regenerate (user-triggered, optional)
+
+A button on `/ideas` labeled **Discover Pillars** when no pillars exist, **Regenerate** otherwise. Calls `regeneratePillarsForUser`:
 
 1. Backfills any missing essences (idempotent).
 2. Asks Groq, **per video**, what folder name each one belongs in. Same call returns the deduped list of folder names + descriptions.
@@ -31,21 +41,9 @@ The user clicks **Discover Pillars** on `/ideas`. `regeneratePillarsForUser` run
 7. Re-runs series detection across every transcript (sweep).
 8. Refreshes the voice profile.
 
-Preserves anything where `source_origin IN ('user_series', 'user_manual', 'ai_series')` OR `is_series = true`. The button is labeled **Discover Pillars** when no pillars exist, **Regenerate** otherwise — same code path either way.
+Preserves anything where `source_origin IN ('user_series', 'user_manual', 'ai_series')` OR `is_series = true`. This is an escape hatch for content drift, niche pivots, or cleaning up after a large delete — not a daily action. The classifier fails open on bad LLM JSON: instead of throwing, it logs the raw response and continues with empty proposals + cosine-fallback retagging.
 
-### 3. Steady state (after Discover, new uploads)
-
-Every subsequent upload runs `tagOrCreatePillarsForVideo`:
-
-| Cosine similarity (top match) | Action |
-| --- | --- |
-| ≥ 0.55 | Fast tag, no LLM call. Multi-tag if a second pillar also scores ≥ 0.72 AND is within 0.05 of top-1. |
-| 0.30 – 0.55 | LLM picks one of the existing pillars OR returns "skip" (video stays Uncategorized). |
-| < 0.30, no pillars match | Untagged — left for the next Discover run. |
-
-**Tag-or-create never proposes a new pillar.** The "new pillar" decision is reserved for Discover, which sees all essences at once and can make a coherent decision instead of spawning narrow one-video pillars. If the creator uploads videos that don't fit any existing pillar, they stack up Uncategorized and the stale-pillar nudge surfaces on `/ideas` suggesting another Discover run.
-
-### 4. Series detection (every upload)
+### 3. Series detection (every upload)
 
 Two layers:
 1. **Regex pre-filter** on the first 500 chars: `episode|series|welcome to (my|the)|part \d|chapter \d|ep\.?\s*\d`. If no match, skip the LLM entirely.
@@ -65,7 +63,7 @@ The previous system was broken in five ways:
 
 A sixth issue surfaced after the bootstrap-on-2nd-upload model went to production: **the pillar set was determined by whichever 2 videos happened to be uploaded first.** With 2 thoughtful essays as seeds, bootstrap proposed something reflective; with a creativity rant + a casual vlog as seeds, bootstrap had nothing in common between them and picked one umbrella ("Personal Growth") that then anchored every subsequent video. Because the creator's library was bigger than 2 videos *most* of the time, the system was always making a coin-flip decision on too little data and locking it in forever.
 
-The fix was structural, not threshold-tuning: **pillar formation is now exclusively user-driven** via Discover Pillars on `/ideas`. Tag-or-create only sorts videos into pillars that already exist. Until the user clicks Discover, videos sit Uncategorized. This matches the creator's mental model — a pillar is a folder; a video gets filed into the folder that fits it; the folder set is something the creator decides about, not something the system invents from the first 2 uploads.
+The fix was to remove bootstrap entirely. Pillar formation is now per-upload: each video runs through tag-or-create, which either matches it into an existing pillar or proposes a new BROAD-named one. Without bootstrap, no two unrelated videos ever get forced into a single umbrella — the first video creates "Creative Thinking" because that's what it's about, the second (a vlog) creates "Vlogs" because nothing else fits, and similar later videos cosine-match into them. The mental model is closer to the creator's intuition: a pillar is a folder; each video gets filed into the folder that fits it (or a new folder is created with a broad name); the system never invents the folder structure from too little data.
 
 The fixes, in the same order:
 

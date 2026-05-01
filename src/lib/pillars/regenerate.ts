@@ -93,7 +93,17 @@ Rules:
     if (raw.startsWith('```json')) raw = raw.replace(/^```json\n?/, '').replace(/\n?```$/, '');
     else if (raw.startsWith('```')) raw = raw.replace(/^```\n?/, '').replace(/\n?```$/, '');
 
-    const parsed = JSON.parse(raw) as { assignments?: unknown; pillars?: unknown };
+    // Fail open on JSON parse errors: log the raw response and return empty
+    // proposals + null assignments. The caller's downstream cosine fallback
+    // can still re-tag videos against any preserved pillars; never block the
+    // entire regen on a single bad response.
+    let parsed: { assignments?: unknown; pillars?: unknown };
+    try {
+        parsed = JSON.parse(raw) as { assignments?: unknown; pillars?: unknown };
+    } catch (err) {
+        console.error('classifyVideosIntoPillars: malformed JSON from Groq, raw response:', raw.slice(0, 500), err);
+        return { pillars: [], assignments: essences.map(() => null) };
+    }
 
     // Build the per-video assignment map. Default everyone to null (no fit) and
     // then overwrite with whatever the LLM returned.

@@ -347,16 +347,21 @@ export default function IdeasPage() {
                 method: 'POST',
                 headers: { 'Authorization': `Bearer ${token}` }
             })
+            const body = await res.json().catch(() => ({}))
             if (res.ok) {
                 const { data } = await supabase.from('pillars').select('*').order('created_at', { ascending: true })
                 if (data) setPillars(data)
                 await fetchPillarState()
                 showToast("Pillars regenerated!")
             } else {
-                showToast("Failed to regenerate")
+                // Surface the real error from the API so we can debug instead
+                // of staring at a generic "Failed to regenerate."
+                const msg = (body && typeof body.error === 'string') ? body.error : `Failed to regenerate (HTTP ${res.status})`
+                showToast(msg)
             }
-        } catch {
-            showToast("Failed to regenerate")
+        } catch (err) {
+            const msg = err instanceof Error ? err.message : 'Failed to regenerate'
+            showToast(msg)
         } finally {
             setIsRegeneratingPillars(false)
         }

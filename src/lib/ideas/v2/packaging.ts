@@ -15,7 +15,7 @@ export const PACKAGING_TYPES: readonly PackagingType[] = [
     {
         id: 'contradiction',
         label: 'Contradiction',
-        hookContract: 'The hook MUST explicitly challenge a widely-held belief in this niche. State the belief, then signal the reversal. e.g. "Most people think X — it\'s actually the opposite."',
+        hookContract: 'The hook MUST explicitly challenge a widely-held belief in this niche. Name the specific belief in concrete terms, then signal the reversal. Do NOT use the phrases "most people think" or "the truth about" — name the belief directly. Good shape: "Everyone keeps telling new founders to charge less. That\'s how you build a business no one respects."',
     },
     {
         id: 'hyper_specific',
@@ -50,7 +50,7 @@ export const PACKAGING_TYPES: readonly PackagingType[] = [
     {
         id: 'behind_the_scenes',
         label: 'Behind the scenes',
-        hookContract: 'The hook MUST reveal something insiders know that outsiders don\'t. "What no one tells you about...", "The thing they don\'t put in the brochure...". Must come from real experience the transcripts support.',
+        hookContract: 'The hook MUST reveal something insiders know that outsiders don\'t — phrased as a specific observation, not a tease. Do NOT use the phrases "what no one tells you" or "the truth about". Name the specific insider truth directly. Good shape: "The deal actually closes when the third stakeholder leaves the room — every other meeting is theater."',
     },
 ];
 

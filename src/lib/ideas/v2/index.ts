@@ -74,7 +74,7 @@ export async function generateIdeasV2ForUser(args: GenerateIdeasV2Args): Promise
 
     let pillarsQuery = supabase
         .from('pillars')
-        .select('id, name, description, subtopics, embedding')
+        .select('id, name, description, subtopics, is_series, embedding')
         .eq('user_id', userId);
     if (pillarIds.length > 0) pillarsQuery = pillarsQuery.in('id', pillarIds);
     const { data: pillars, error: pillarsError } = await pillarsQuery;

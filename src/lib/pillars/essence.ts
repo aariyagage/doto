@@ -168,6 +168,7 @@ export async function ensureEssenceForTranscript(
             .from('transcripts')
             .update({
                 essence: legacy,
+                essence_topic: parts.topic,
                 essence_core_idea: parts.core_idea,
                 essence_hook: parts.hook,
                 essence_takeaway: parts.takeaway,

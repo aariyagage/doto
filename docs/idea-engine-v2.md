@@ -121,7 +121,7 @@ The prompt anchors `core_idea` quality with a bad/good example pair baked in:
 > ✅ "people fail at productivity because they rely on motivation instead of reducing decisions"
 
 Persistence:
-- New columns: `essence_core_idea`, `essence_hook`, `essence_takeaway`, `hook_embedding`. (`topic` is currently captured into the legacy `essence` column only — no dedicated column yet.)
+- New columns: `essence_core_idea`, `essence_hook`, `essence_takeaway`, `hook_embedding`, **`essence_topic`** (added in migration 005 so `tag-or-create` and `series-detector` can read it cleanly).
 - Legacy `essence` column keeps getting populated as `topic // core_idea // takeaway` so pillar tagging (which reads `essence_embedding`) carries topical signal again.
 - `hook_embedding` is computed only when `hook` is non-null.
 - `ESSENCE_MAX` is 480 chars to fit topic + core_idea + takeaway with separators; well under MiniLM's ~1000-char limit.
@@ -141,6 +141,17 @@ Persistence:
 | `energy` | text | low-key, measured, animated, intense, … |
 
 v1 fields are not removed and not deprecated. The v2 idea prompt **falls back to v1 fields when v2 fields are null** — so a legacy voice profile still produces v2 ideas, just with thinner voice context.
+
+### 2.5. Series-aware context retrieval (added post-Phase-1)
+
+Meta-format series like "Things I've Been Thinking About" cover a different topic per episode. The default word-count ranking in `context-builder.ts` made every idea in a batch anchor on whichever episode was longest, so all 3 ideas for the series ended up about the same theme even though the creator's intent is a new topic per episode.
+
+When `pillar.is_series === true`, `context-builder` now:
+- Orders transcripts by `created_at desc` (most recent episodes first) instead of word_count.
+- Trims each episode's raw text to ~700 chars so 4-5 episodes share the prompt budget evenly.
+- Sets `isSeries=true` on the `V2PillarContext`, which switches the user message to a meta-format instruction: *"these are past episodes — match the format, propose a NEW topic the creator hasn't covered."*
+
+Pre-v2 series pillars never collected `subtopics` at all (the per-upload `series-detector` and the `tag-or-create` fast-tag path both skipped subtopic capture), so the "don't retread" rule had nothing to work with. Migration 005's `essence_topic` column plus the shared `tagVideoToPillar` helper now feed each episode's topic into `pillars.subtopics` automatically — see `docs/pillar-system.md` for the full subtopic-accumulation table.
 
 ### 3. Idea engine v2 — packaging × angle × subtopics
 
@@ -169,11 +180,12 @@ Concurrency: `PILLAR_CONCURRENCY=2` (matches v1). Within a pillar, calls are seq
 
 **Why:** the project precedent (`NEW_PILLAR_PIPELINE`) gates breaking-ish behavior changes behind an env var so production behavior is preserved on deploy.
 
-**What:** `IDEA_ENGINE_V2` env var, read in three places:
+**What:** `IDEA_ENGINE_V2` env var, read in four places:
 
 - `src/lib/pillars/essence.ts` — switches essence prompt + persistence.
 - `src/lib/pillars/voice-profile.ts` — switches voice profile prompt + persistence.
-- `src/app/api/ideas/generate/route.ts` — selects `generateIdeasV2ForUser` vs `generateIdeasForUser`.
+- `src/app/api/ideas/generate/route.ts` — selects `generateIdeasV2ForUser` vs `generateIdeasForUser` for the manual Generate button.
+- `src/lib/pillars/auto-ideas.ts` — same selection for the on-upload top-up path. Without this, `IDEA_ENGINE_V2=true` would still emit v1 ideas immediately after upload (the user's first impression of the engine), undermining every v2 prompt fix.
 
 Default: unset = v1 path. To activate: set `IDEA_ENGINE_V2=true`.
 

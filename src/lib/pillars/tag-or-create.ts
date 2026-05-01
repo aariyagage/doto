@@ -108,7 +108,7 @@ OR
     return JSON.parse(raw) as LlmTagDecision;
 }
 
-async function appendSubtopic(
+export async function appendSubtopic(
     supabase: SupabaseServer,
     pillarId: string,
     subtopic: string | undefined,
@@ -129,7 +129,10 @@ async function appendSubtopic(
     await supabase.from('pillars').update({ subtopics: updated }).eq('id', pillarId);
 }
 
-async function tagVideoToPillar(
+// Shared by tag-or-create's fast / LLM paths AND by series-detector. Centralizing
+// the insert + last_tagged_at + subtopic appending here means a future change
+// (e.g. logging, telemetry, retry) only needs to land in one place.
+export async function tagVideoToPillar(
     supabase: SupabaseServer,
     videoId: string,
     pillarId: string,
@@ -138,7 +141,9 @@ async function tagVideoToPillar(
     const { error } = await supabase
         .from('video_pillars')
         .insert({ video_id: videoId, pillar_id: pillarId });
-    // Tolerate "already tagged" errors. Anything else is logged but not fatal.
+    // Tolerate "already tagged" errors (the DB has a UNIQUE(video_id, pillar_id)
+    // constraint as of migration 005, so a redundant insert raises 23505 here).
+    // Anything else is logged but not fatal.
     if (error && !/duplicate|unique/i.test(error.message)) {
         console.error(`video_pillars insert failed (video=${videoId}, pillar=${pillarId}):`, error.message);
     }
@@ -157,10 +162,13 @@ export async function tagOrCreatePillarsForVideo(
     const { supabase, groq, userId, videoId, transcriptId } = args;
     const result = { tagged: [] as string[], created: [] as string[], untagged: false };
 
-    // 1. Load this transcript's essence_embedding.
+    // 1. Load this transcript's essence + embedding + topic. essence_topic
+    //    feeds straight into pillars.subtopics so the "don't retread" rule in
+    //    idea generation actually has data to work with — even on the fast-tag
+    //    path that bypasses the LLM.
     const { data: transcript, error: tErr } = await supabase
         .from('transcripts')
-        .select('essence, essence_embedding')
+        .select('essence, essence_embedding, essence_topic')
         .eq('id', transcriptId)
         .single();
 
@@ -169,6 +177,7 @@ export async function tagOrCreatePillarsForVideo(
     }
     const essence = (transcript.essence as string | null) || '';
     const essenceEmbedding = parseEmbedding(transcript.essence_embedding);
+    const transcriptTopic = (transcript.essence_topic as string | null) || undefined;
     if (!essence || !essenceEmbedding) {
         result.untagged = true;
         return result;
@@ -178,10 +187,11 @@ export async function tagOrCreatePillarsForVideo(
     const matches = await findSimilarPillars(supabase, userId, essenceEmbedding, TAG_AMBIGUOUS_FLOOR);
     const top = matches[0];
 
-    // 3. Strong match → tag fast, no LLM call. (No subtopic captured here —
-    //    we'd need an extra LLM call. Subtopics accrue from LLM-band uploads.)
+    // 3. Strong match → tag fast, no LLM call. We pass the v2-essence topic
+    //    so subtopics still accumulate without a Groq call. Pre-v2 transcripts
+    //    have no topic; appendSubtopic short-circuits cleanly on undefined.
     if (top && top.similarity >= TAG_FAST_THRESHOLD) {
-        await tagVideoToPillar(supabase, videoId, top.id);
+        await tagVideoToPillar(supabase, videoId, top.id, transcriptTopic);
         result.tagged.push(top.id);
         const second = matches[1];
         if (
@@ -189,7 +199,7 @@ export async function tagOrCreatePillarsForVideo(
             second.similarity >= TAG_SECOND_PILLAR_THRESHOLD &&
             (top.similarity - second.similarity) <= TAG_SECOND_PILLAR_GAP
         ) {
-            await tagVideoToPillar(supabase, videoId, second.id);
+            await tagVideoToPillar(supabase, videoId, second.id, transcriptTopic);
             result.tagged.push(second.id);
         }
         return result;

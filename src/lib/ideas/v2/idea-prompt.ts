@@ -21,6 +21,7 @@ export type V2VoiceProfile = {
 export type V2PillarContext = {
     name: string;
     description: string | null;
+    isSeries: boolean;                 // true → meta-format pillar; the prompt switches to "propose a NEW topic in this format"
     subtopicsAlreadyCovered: string[]; // pillars.subtopics — feeds the "don't repeat what they've made" rule
     transcriptEssences: string[];      // 3-5 essences ranked by similarity
     transcriptRaw: string;             // joined raw text, used for grounding checks downstream
@@ -110,6 +111,15 @@ export function buildV2UserMessage(params: {
         ? pillar.transcriptEssences.map((e, i) => `[${i + 1}] ${e}`).join('\n')
         : '(no essences available — work from voice profile + pillar description)';
 
+    const seriesBlock = pillar.isSeries
+        ? [
+            '',
+            '== THIS IS A META-FORMAT SERIES ==',
+            'This pillar is a recurring branded series, not a topic. Each episode tackles a DIFFERENT subject under the same format. The transcripts above are past episodes — treat them as evidence of FORMAT (cadence, opening style, vibe), NOT as the topic to keep talking about.',
+            'Your job: propose a brand-new TOPIC the creator has not covered yet, that would naturally fit a new episode of this series. Do not paraphrase or extend any existing episode. The new topic should feel like something the creator could plausibly think about next, given their voice and the format — but it should be a different subject from any of the listed subtopics.',
+        ].join('\n')
+        : '';
+
     return [
         '== CREATOR VOICE ==',
         voiceBlock(voiceProfile),
@@ -118,6 +128,7 @@ export function buildV2UserMessage(params: {
         `Name: ${pillar.name}`,
         pillar.description ? `Description: ${pillar.description}` : '',
         `Subtopics this creator has ALREADY covered under this pillar — do NOT retread these: ${subtopicsLine}`,
+        seriesBlock,
         '',
         '== TRANSCRIPT ESSENCES (ranked by relevance to this pillar) ==',
         essenceBlock,
@@ -130,7 +141,9 @@ export function buildV2UserMessage(params: {
         `Packaging: ${packaging.label}`,
         `Hook contract: ${packaging.hookContract}`,
         '',
-        'Generate exactly ONE idea using the assigned angle and packaging. Avoid the subtopics already covered.',
+        pillar.isSeries
+            ? 'Generate exactly ONE idea using the assigned angle and packaging. The topic MUST be new — not any of the subtopics listed above. Use the past episodes only to match the series\' voice/format.'
+            : 'Generate exactly ONE idea using the assigned angle and packaging. Avoid the subtopics already covered.',
         '',
         'Return ONLY this JSON (no extra fields, no preamble):',
         '{',

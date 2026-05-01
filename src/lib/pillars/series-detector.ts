@@ -1,6 +1,7 @@
 import type Groq from 'groq-sdk';
 import { embedText } from './embeddings';
 import { findClosestPillar, PILLAR_DEDUP_COSINE_THRESHOLD } from './dedup';
+import { tagVideoToPillar } from './tag-or-create';
 import { getCombo } from '@/lib/colors';
 import type { SupabaseServer } from './types';
 
@@ -212,16 +213,28 @@ export async function detectAndPersistSeriesIfApplicable(
         }
     }
 
-    // Tag the video. Ignore unique-violation in case it was already tagged.
-    await supabase
-        .from('video_pillars')
-        .insert({ video_id: videoId, pillar_id: pillarId });
+    // Tag the video via the shared helper. Pulls the v2 essence_topic for this
+    // video so series pillars (like "Things I've Been Thinking About") accumulate
+    // the per-episode topics in pillars.subtopics — without this, series pillars
+    // never collected subtopics and the "don't retread" rule in idea generation
+    // had no data to work with, so every batch ended up about the same theme.
+    let episodeTopic: string | undefined;
+    try {
+        const { data: tRow } = await supabase
+            .from('transcripts')
+            .select('essence_topic')
+            .eq('video_id', videoId)
+            .eq('user_id', userId)
+            .maybeSingle();
+        const t = tRow?.essence_topic;
+        if (typeof t === 'string' && t.trim().length > 0) {
+            episodeTopic = t.trim();
+        }
+    } catch (err) {
+        console.error('Series detection: failed to fetch episode topic (non-fatal):', err);
+    }
 
-    await supabase
-        .from('pillars')
-        .update({ last_tagged_at: new Date().toISOString() })
-        .eq('id', pillarId)
-        .eq('user_id', userId);
+    await tagVideoToPillar(supabase, videoId, pillarId, episodeTopic);
 
     return { created, pillarId };
 }

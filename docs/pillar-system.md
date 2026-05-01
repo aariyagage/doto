@@ -177,6 +177,21 @@ All thresholds chosen for MiniLM-L6-v2 on 200-400 char inputs. Should be revisit
 
 - `migrations/002_pillar_overhaul.sql` — adds the new `pillars` and `transcripts` columns, indexes, and the `match_pillar_by_embedding` RPC.
 - `migrations/003_pillar_subtopics.sql` — adds `pillars.subtopics text[]`.
+- `migrations/004_idea_engine_v2.sql` — see `docs/idea-engine-v2.md`. Adds the v2 essence and voice-profile columns; orthogonal to pillar formation but read by the v2 idea generator.
+- `migrations/005_video_pillars_unique_and_essence_topic.sql` — dedupes existing `video_pillars` rows and adds a `UNIQUE (video_id, pillar_id)` constraint so the same pillar can't be attached to a video twice. Also adds `transcripts.essence_topic` (the v2 essence's concrete topic noun phrase, promoted to its own column so `tag-or-create` and `series-detector` can read it without parsing the legacy essence string).
+
+## Subtopic accumulation
+
+Every tag path now appends a subtopic to `pillars.subtopics` so the idea generator's "don't retread these" rule has data on every pillar — not just the ones that hit the LLM band.
+
+| Path | Subtopic source |
+| --- | --- |
+| `tag-or-create` fast-tag (cosine ≥ 0.55) | `transcripts.essence_topic` (v2 only — undefined on pre-v2 transcripts, append no-ops) |
+| `tag-or-create` LLM band | The LLM-extracted `subtopic` field from the tag decision |
+| `series-detector` (per-upload) | `transcripts.essence_topic` for the video being detected |
+| `bootstrap` | The full subtopic list comes back from the bootstrap LLM proposal — no per-video append needed |
+
+The `tagVideoToPillar` helper in `tag-or-create.ts` is now exported and shared by `series-detector.ts` so both paths run the same insert + `last_tagged_at` + subtopic-append sequence in one place.
 
 ## Known gaps
 

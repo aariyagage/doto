@@ -1,8 +1,13 @@
 import type Groq from 'groq-sdk';
 import { generateIdeasForUser } from '@/lib/ideas/generate';
+import { generateIdeasV2ForUser } from '@/lib/ideas/v2';
 import type { SupabaseServer } from './types';
 
 const TARGET_UNUSED_PER_PILLAR = 3;
+
+function ideaEngineV2Enabled(): boolean {
+    return process.env.IDEA_ENGINE_V2 === 'true';
+}
 
 interface TopUpArgs {
     supabase: SupabaseServer;
@@ -44,7 +49,12 @@ export async function topUpIdeasForPillars(args: TopUpArgs): Promise<{ generated
     if (needsTopUp.length === 0) return { generated: 0, pillarsToppedUp: 0 };
 
     try {
-        const result = await generateIdeasForUser({
+        // Mirror the manual-generate route's flag behavior so the auto-top-up
+        // produces ideas under the same engine the user sees when they hit
+        // "Generate." Without this, IDEA_ENGINE_V2=true would still send v1
+        // ideas straight after upload, undermining every v2 prompt fix.
+        const generator = ideaEngineV2Enabled() ? generateIdeasV2ForUser : generateIdeasForUser;
+        const result = await generator({
             supabase,
             userId,
             pillarIds: needsTopUp,

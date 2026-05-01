@@ -28,10 +28,10 @@ export type V2PillarContext = {
 };
 
 export const V2_SYSTEM_MESSAGE = [
-    'You are a senior creative director for a short-form-video creator. You produce ONE idea at a time, grounded in the transcripts the creator has actually filmed.',
+    'You are a senior creative director for a short-form-video creator. You produce ONE idea at a time. The creator\'s transcripts are your reference for their VOICE, TONE, and WORLDVIEW — not a constraint on which topics you can propose.',
     '',
-    'CARDINAL RULE — DO NOT INVENT.',
-    'No client names, dollar amounts, dates, or scenes that don\'t appear in the transcripts. If the packaging contract requires specifics that aren\'t present, return abstract specifics-free language instead. Fabricated specifics are worse than honest abstraction.',
+    'CARDINAL RULE — DO NOT FABRICATE SPECIFIC FACTS.',
+    'Do not invent client names, dollar amounts, dates, or scenes the creator did not actually live. You ARE encouraged — in fact required — to generate NEW ideas, angles, and perspectives that go beyond anything in the transcripts. Transcripts teach you how this person speaks; they do NOT cap which topics you can explore. If the packaging contract calls for specifics and the transcripts don\'t supply them, write the idea in abstract specifics-free language rather than fabricating.',
     '',
     'PACKAGING IS THE PRIMARY AXIS.',
     'You are assigned exactly one packaging_type per call. The hook MUST reflect that packaging type — see the hook contract in the user message. tension_type and format are still emitted in the response, but they are SECONDARY descriptors, not drivers.',
@@ -39,8 +39,8 @@ export const V2_SYSTEM_MESSAGE = [
     'ANGLE IS THE PERSPECTIVE.',
     'You are also assigned one angle. The angle decides the stance the idea takes; the packaging decides the shape the idea takes. They compose: angle × packaging × creator-voice = idea.',
     '',
-    'AVOID REPEATING THE CREATOR.',
-    'You will be given a list of subtopics the creator has already covered under this pillar. Do not propose ideas that retread those subtopics — find an adjacent or unexplored angle within the same pillar.',
+    'NOVELTY IS REQUIRED.',
+    'Do NOT paraphrase, summarize, restate, or remix transcript content. Transcripts are voice reference only — never a topic menu. You will also be given subtopics the creator has already covered under this pillar; do not retread those either. Push toward NEW or UNEXPLORED directions within the pillar — ideas the creator has not yet made but would plausibly say given their voice, beliefs, and worldview. An idea that simply re-frames something the transcripts already say is a failure.',
     '',
     'HOOK RULES.',
     '- 8 to 18 words.',
@@ -133,7 +133,7 @@ export function buildV2UserMessage(params: {
         '== TRANSCRIPT ESSENCES (ranked by relevance to this pillar) ==',
         essenceBlock,
         '',
-        '== TRANSCRIPT EXCERPTS (the only source of truth for any specific quoted detail) ==',
+        '== TRANSCRIPT EXCERPTS (VOICE REFERENCE ONLY — for tone, cadence, vocabulary, and worldview; NOT a topic menu, NOT content to paraphrase) ==',
         pillar.transcriptRaw.slice(0, 4000),
         '',
         '== ASSIGNMENT ==',
@@ -142,8 +142,8 @@ export function buildV2UserMessage(params: {
         `Hook contract: ${packaging.hookContract}`,
         '',
         pillar.isSeries
-            ? 'Generate exactly ONE idea using the assigned angle and packaging. The topic MUST be new — not any of the subtopics listed above. Use the past episodes only to match the series\' voice/format.'
-            : 'Generate exactly ONE idea using the assigned angle and packaging. Avoid the subtopics already covered.',
+            ? 'Generate exactly ONE idea using the assigned angle and packaging. The topic MUST be new — not any of the subtopics listed above, and not a paraphrase of any past episode. Use the past episodes only to match the series\' voice/format, never as content to restate.'
+            : 'Generate exactly ONE idea using the assigned angle and packaging. The idea MUST be NEW — push into territory the creator has not yet covered, not a paraphrase or re-framing of anything in the transcripts. Use the transcripts only to match voice, never as a source of topics.',
         '',
         'Return ONLY this JSON (no extra fields, no preamble):',
         '{',

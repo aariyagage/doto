@@ -11,7 +11,6 @@ import Groq from 'groq-sdk';
 import ffmpeg from 'fluent-ffmpeg';
 import ffmpegInstaller from '@ffmpeg-installer/ffmpeg';
 import { ensureEssenceForTranscript } from '@/lib/pillars/essence';
-import { bootstrapPillarsForUser } from '@/lib/pillars/bootstrap';
 import { tagOrCreatePillarsForVideo } from '@/lib/pillars/tag-or-create';
 import { detectAndPersistSeriesIfApplicable } from '@/lib/pillars/series-detector';
 import { topUpIdeasForPillars } from '@/lib/pillars/auto-ideas';
@@ -282,29 +281,24 @@ export async function POST(request: Request) {
                             // 1. Per-transcript essence + embedding (idempotent).
                             await ensureEssenceForTranscript(supabase, transcriptId, groq);
 
-                            // 2. Count user's eligible (non-hidden) transcripts.
-                            const { count: transcriptCount, error: countErr } = await supabase
-                                .from('transcripts')
-                                .select('*', { count: 'exact', head: true })
-                                .eq('user_id', user.id)
-                                .or('is_hidden.is.null,is_hidden.eq.false');
-                            if (countErr) throw new Error(`Failed to count transcripts: ${countErr.message}`);
+                            // 2. Sort this video into an existing pillar if one fits.
+                            //    No auto-creation: tag-or-create only sorts now,
+                            //    pillar creation is exclusively user-triggered via
+                            //    Discover Pillars on /ideas. The previous bootstrap
+                            //    path (auto-create pillars from the 2nd upload) was
+                            //    removed because 2 videos is too small a sample to
+                            //    define a creator's pillar set, and whichever broad
+                            //    umbrella the LLM picked then anchored every later
+                            //    upload (the "everything → Personal Growth" trap).
+                            await tagOrCreatePillarsForVideo({
+                                supabase, groq, userId: user.id, videoId, transcriptId,
+                            });
 
-                            // 3. Branch on transcript count.
-                            //    - 1: onboarding state, no pillars yet.
-                            //    - 2: bootstrap path — generate first pillars + voice profile.
-                            //    - 3+: steady state — tag-or-create against existing pillars.
-                            if (transcriptCount === 1) {
-                                console.log(`User ${user.id} has 1 transcript — deferring pillar generation until 2nd upload.`);
-                            } else if (transcriptCount === 2) {
-                                await bootstrapPillarsForUser({ supabase, groq, userId: user.id });
-                            } else {
-                                await tagOrCreatePillarsForVideo({
-                                    supabase, groq, userId: user.id, videoId, transcriptId,
-                                });
-                            }
-
-                            // 4. Series detection (regex pre-filter; LLM only fires on hits).
+                            // 3. Series detection (regex pre-filter; LLM only fires
+                            //    on hits). Series pillars are still auto-created
+                            //    because they respond to an explicit signal in the
+                            //    transcript ("welcome to my series"), not LLM
+                            //    guessing — high precision.
                             await detectAndPersistSeriesIfApplicable({
                                 supabase, groq, userId: user.id, videoId,
                                 transcriptText: fullTranscriptText,

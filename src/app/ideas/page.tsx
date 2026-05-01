@@ -449,7 +449,7 @@ export default function IdeasPage() {
                             <div className="flex items-start justify-between mb-5">
                                 <div>
                                     <h3 className="text-lg font-bold font-heading text-gray-900 dark:text-white leading-tight">Your Content Pillars</h3>
-                                    <p className="text-[var(--muted-foreground)] font-ui text-sm mt-1">Auto-generated from your voice profile. Select pillars to filter ideas.</p>
+                                    <p className="text-[var(--muted-foreground)] font-ui text-sm mt-1">Folders for your videos. Click Discover to organize them, or select pillars below to filter ideas.</p>
                                 </div>
                                 <div className="flex items-center gap-2">
                                     {pillars.length > 0 && (
@@ -462,17 +462,17 @@ export default function IdeasPage() {
                                             Clear all
                                         </button>
                                     )}
-                                    {/* Regenerate is always visible once the user has enough transcripts.
-                                        Hidden during onboarding (< 2 transcripts) so users don't try to
-                                        regenerate from nothing. */}
-                                    {(pillarState?.eligibleTranscriptCount ?? 0) >= 2 && (
+                                    {/* Discover/Regenerate is always visible once the user has at least
+                                        one transcript. Pillars are no longer auto-created on upload —
+                                        the user runs Discover when they're ready to organize their videos. */}
+                                    {(pillarState?.eligibleTranscriptCount ?? 0) >= 1 && (
                                         <button
                                             onClick={regeneratePillars}
                                             disabled={isRegeneratingPillars}
                                             className="text-xs font-bold font-heading text-blue-600 hover:text-blue-700 transition-colors flex items-center whitespace-nowrap bg-blue-50 dark:bg-blue-500/10 hover:bg-blue-100 px-3 py-1.5 rounded-lg"
                                         >
                                             {isRegeneratingPillars ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : <RefreshCw className="h-4 w-4 mr-1.5" />}
-                                            Regenerate
+                                            {pillars.length === 0 ? 'Discover Pillars' : 'Regenerate'}
                                         </button>
                                     )}
                                 </div>
@@ -507,15 +507,16 @@ export default function IdeasPage() {
 
                             <div className="flex flex-wrap gap-4 relative">
                                 {pillars.length === 0 ? (
-                                    (pillarState?.eligibleTranscriptCount ?? 0) < 2 ? (
+                                    (pillarState?.eligibleTranscriptCount ?? 0) < 1 ? (
                                         <p className="text-gray-500 dark:text-gray-400 text-sm w-full font-ui">
-                                            Upload at least 2 videos to discover your pillars.
+                                            Upload a video to get started.
                                             {' '}
                                             <a href="/upload" className="font-bold text-blue-600 hover:underline">Upload now →</a>
                                         </p>
                                     ) : (
                                         <p className="text-gray-400 dark:text-gray-500 text-sm italic w-full font-ui">
-                                            Pillars haven&apos;t been generated yet. Click Regenerate above.
+                                            You have {pillarState?.eligibleTranscriptCount ?? 0} video{(pillarState?.eligibleTranscriptCount ?? 0) === 1 ? '' : 's'} ready.
+                                            Click <span className="font-bold text-blue-600">Discover Pillars</span> above to organize them into folders.
                                         </p>
                                     )
                                 ) : (

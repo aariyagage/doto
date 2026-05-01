@@ -76,9 +76,8 @@ export default function UploadPage() {
 
                         {completedCount > 0 && (
                             <div className="text-center font-caslon italic text-lg text-[var(--text-primary)]/70 mt-2">
-                                {completedCount === 1 && "1 video analyzed \u00b7 add 1 more to discover your pillars"}
-                                {completedCount === 2 && "2 videos analyzed \u00b7 your first pillars are being discovered"}
-                                {(completedCount >= 3 && completedCount <= 4) && `${completedCount} videos analyzed \u00b7 good coverage`}
+                                {completedCount === 1 && "1 video analyzed \u00b7 head to Ideas to discover your pillars"}
+                                {(completedCount >= 2 && completedCount <= 4) && `${completedCount} videos analyzed \u00b7 head to Ideas to discover your pillars`}
                                 {completedCount >= 5 && `${completedCount} videos analyzed \u00b7 great coverage`}
                             </div>
                         )}

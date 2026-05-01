@@ -17,11 +17,23 @@ interface ProposedPillar {
     subtopics: string[];
 }
 
-async function proposeRegeneratedPillars(args: {
+// Per-video classification: ask the LLM to file each essence into a folder,
+// then group videos that landed in the same folder. This matches the user's
+// mental model — "this video is a vlog → file under Vlogs; this video is a
+// productivity hack → file under Productivity" — instead of asking the LLM
+// to invent N umbrellas up front and pray they cover the corpus.
+//
+// The grouping happens on the LLM side because letting it see all essences
+// lets it normalize — "casual day in college" and "weekend trip with friends"
+// both go under "Daily Life" because the LLM saw them in the same call.
+async function classifyVideosIntoPillars(args: {
     essences: string[];
     preserved: { name: string; description: string | null; is_series: boolean }[];
     groq: Groq;
-}): Promise<ProposedPillar[]> {
+}): Promise<{
+    pillars: ProposedPillar[];
+    assignments: (string | null)[]; // assignments[i] = pillar name for essence i, or null = no good fit
+}> {
     const { essences, preserved, groq } = args;
     const lines = essences.map((e, i) => `[${i + 1}] ${e}`).join('\n');
     const preservedBlock = preserved.length
@@ -30,48 +42,48 @@ async function proposeRegeneratedPillars(args: {
 
     const completion = await groq.chat.completions.create({
         model: 'llama-3.3-70b-versatile',
-        temperature: 0.4,
+        temperature: 0.3,
         response_format: { type: 'json_object' },
         messages: [
             {
                 role: 'system',
-                content: `You re-derive a creator's content TERRITORIES from all their video essences. Treat each essence as a glimpse — generalize to find the broad umbrella themes.
+                content: `You classify a creator's videos into content pillars (folders). For each video essence below, you decide which folder it belongs in. Then you list every distinct folder you used.
 
-CRITICAL RULES:
-- BROAD pillars only. 1-3 word names.
-- Specific topics are SUBTOPICS, not pillars.
-- A creator with 20 videos shouldn't have 20 pillars. They should have 2-5.
-- Group lookalikes — output "Mindset" OR "Mindset Shifts", never both.
-- Never propose a synonym, rephrasing, or near-duplicate of an existing preserved pillar.
+How to think about this:
+- A pillar is a folder. Each video gets filed into exactly one folder.
+- File based on WHAT THE VIDEO ACTUALLY IS — its subject or its format. A vlog about a college day belongs in "Daily Life" or "Vlogs". A video about productivity hacks belongs in "Productivity". A reflective essay belongs in "Cultural Commentary" or similar.
+- Use the SAME folder name for videos that genuinely belong together. Two college vlogs are both "Daily Life", not "College Life" + "Vlogs".
+- Folder names are 1-3 words. Broad enough that future videos in the same vein can also live there.
+- If a video genuinely doesn't fit anywhere with the others, it can have its own folder — but only if no later video in the list shares its theme.
 
-GOOD examples (broad umbrellas):
-- "time blocking" + "morning routine" + "focus rituals" + "Pomodoro" → "Productivity"
-- "lipstick swatches" + "skincare layering" + "makeup haul" → "Beauty"
-- "Q1 revenue" + "pricing experiment" + "first hire" → "Founder Diaries"
-- "day in college" + "study session" + "weekend trip" → "Daily Life" or "Vlogs"
-- "thought daughter" + "main character energy" + "internet feminism" → "Cultural Commentary"
+PRESERVE these existing pillars verbatim — if a video belongs to one, file it there. Do not rename them, do not propose synonyms:
+${preservedBlock}
 
-BAD examples (too narrow — DO NOT do this):
-- 4 college vlogs → ❌ "College Life" — that's a subtopic of "Daily Life"
-- 3 morning-related productivity videos → ❌ "Morning Routines" — that's a subtopic of "Productivity"
-- 2 videos about online discourse → ❌ "Female Voice" or "Internet Drama" — those are subtopics of "Cultural Commentary"
+Naming rules:
+- Title Case. 1-3 words. No qualifiers like "College", "Morning", "Female", "Pricing" — those are subtopics, not folder names.
+- ✅ "Vlogs", "Productivity", "Beauty", "Cultural Commentary", "Founder Diaries", "Daily Life", "Cooking"
+- ❌ "College Life" (just "Daily Life"), "Morning Routines" (just "Productivity"), "Female Voice" (just "Cultural Commentary"), "Brand X Reviews" (just "Beauty")
 
-When you're tempted to use a specific qualifier in a pillar name ("College", "Morning", "Pricing", "Female"), STOP — that qualifier almost always belongs in subtopics, not the pillar name.
+When in doubt: prefer fewer folders over more. A creator with 20 videos should typically have 2-5 folders, not 8+.
 
 Return only valid JSON.`,
             },
             {
                 role: 'user',
-                content: `PRESERVE these user-declared pillars verbatim — DO NOT propose them again, DO NOT propose anything semantically similar:
-${preservedBlock}
-
-Essences (one per video):
+                content: `Video essences (one per video, numbered):
 ${lines}
 
-Return ONLY this JSON:
-{ "pillars": [ { "name": string (1-3 words, BROAD), "description": string (one sentence), "subtopics": string[] (2-6 specific topics from the essences that live under this pillar) } ] }
+Return ONLY this JSON shape:
+{
+  "assignments": [ { "video": <number 1..N>, "pillar": "<folder name OR null if it truly fits nothing else and shouldn't be its own folder either>" }, ... ],
+  "pillars": [ { "name": "<distinct folder name used in assignments>", "description": "<one sentence>", "subtopics": [ "<1-3 word topic from one of the essences filed here>", ... ] }, ... ]
+}
 
-CAP the total at ${REGEN_PILLAR_TARGET} pillars INCLUDING the preserved ones. So if there are ${preserved.length} preserved, return at most ${Math.max(0, REGEN_PILLAR_TARGET - preserved.length)} new pillars.`,
+Rules:
+- "assignments" must include EVERY video number from 1 to ${essences.length}.
+- "pillars" must list every distinct name that appears in assignments (excluding null).
+- "pillars" must NOT include any of the preserved pillars listed above (we already have them).
+- Total NEW pillars (not counting preserved) must be ≤ ${Math.max(1, REGEN_PILLAR_TARGET - preserved.length)}.`,
             },
         ],
     });
@@ -81,26 +93,39 @@ CAP the total at ${REGEN_PILLAR_TARGET} pillars INCLUDING the preserved ones. So
     if (raw.startsWith('```json')) raw = raw.replace(/^```json\n?/, '').replace(/\n?```$/, '');
     else if (raw.startsWith('```')) raw = raw.replace(/^```\n?/, '').replace(/\n?```$/, '');
 
-    const parsed = JSON.parse(raw) as { pillars?: unknown };
-    if (!Array.isArray(parsed.pillars)) {
-        throw new Error('Regenerate response missing pillars array.');
-    }
+    const parsed = JSON.parse(raw) as { assignments?: unknown; pillars?: unknown };
 
-    const result: ProposedPillar[] = [];
-    for (const p of parsed.pillars as Array<Record<string, unknown>>) {
-        const name = typeof p.name === 'string' ? p.name.trim() : '';
-        const description = typeof p.description === 'string' ? p.description.trim() : '';
-        const subtopics = Array.isArray(p.subtopics)
-            ? (p.subtopics as unknown[])
-                .filter((s): s is string => typeof s === 'string' && s.trim().length > 0)
-                .map(s => s.trim())
-                .slice(0, 8)
-            : [];
-        if (name && description && name.length <= 60) {
-            result.push({ name, description, subtopics });
+    // Build the per-video assignment map. Default everyone to null (no fit) and
+    // then overwrite with whatever the LLM returned.
+    const assignments: (string | null)[] = essences.map(() => null);
+    if (Array.isArray(parsed.assignments)) {
+        for (const a of parsed.assignments as Array<Record<string, unknown>>) {
+            const v = typeof a.video === 'number' ? a.video : null;
+            const p = typeof a.pillar === 'string' ? a.pillar.trim() : '';
+            if (v !== null && v >= 1 && v <= essences.length) {
+                assignments[v - 1] = p && p.toLowerCase() !== 'null' ? p : null;
+            }
         }
     }
-    return result;
+
+    const proposed: ProposedPillar[] = [];
+    if (Array.isArray(parsed.pillars)) {
+        for (const p of parsed.pillars as Array<Record<string, unknown>>) {
+            const name = typeof p.name === 'string' ? p.name.trim() : '';
+            const description = typeof p.description === 'string' ? p.description.trim() : '';
+            const subtopics = Array.isArray(p.subtopics)
+                ? (p.subtopics as unknown[])
+                    .filter((s): s is string => typeof s === 'string' && s.trim().length > 0)
+                    .map(s => s.trim())
+                    .slice(0, 8)
+                : [];
+            if (name && description && name.length <= 60) {
+                proposed.push({ name, description, subtopics });
+            }
+        }
+    }
+
+    return { pillars: proposed, assignments };
 }
 
 export interface RegenerateOptions {
@@ -169,8 +194,9 @@ export async function regeneratePillarsForUser(options: RegenerateOptions): Prom
     });
     const disposable = (existingPillars || []).filter(p => !preserved.find(pp => pp.id === p.id));
 
-    // 4. Ask the LLM for the new AI pillar set.
-    const proposed = await proposeRegeneratedPillars({
+    // 4. Per-video classification: the LLM files each essence into a folder.
+    //    We get back a pillar set + per-video assignments (essence index → name).
+    const { pillars: proposedPillars, assignments } = await classifyVideosIntoPillars({
         essences,
         preserved: preserved.map(p => ({
             name: p.name as string,
@@ -180,9 +206,10 @@ export async function regeneratePillarsForUser(options: RegenerateOptions): Prom
         groq,
     });
 
-    // 5. Embed + dedup each proposal against ALL existing pillars (preserved AND
-    //    disposable). This lets the loop be idempotent: a proposal that exactly
-    //    matches an existing AI pillar reuses it instead of churning.
+    // 5. Embed + dedup each proposed pillar against ALL existing pillars
+    //    (preserved AND disposable). Lets the loop be idempotent: a proposal
+    //    that exactly matches an existing AI pillar reuses it instead of
+    //    churning name/embedding rows.
     interface Candidate {
         name: string;
         description: string;
@@ -191,7 +218,7 @@ export async function regeneratePillarsForUser(options: RegenerateOptions): Prom
         existingId: string | null;
     }
     const candidates: Candidate[] = [];
-    for (const p of proposed) {
+    for (const p of proposedPillars) {
         let embedding: number[];
         try {
             embedding = await embedText(`${p.name}. ${p.description}`);
@@ -270,7 +297,11 @@ export async function regeneratePillarsForUser(options: RegenerateOptions): Prom
     }
 
     // 8. Batch re-tag. Wipe existing tags for this user's videos first, then
-    //    cosine-tag every transcript against the new pillar set.
+    //    apply the LLM's per-video assignments. We honor the LLM's choice
+    //    (including assignments to preserved pillars) by name-lookup. For
+    //    videos the LLM marked null OR whose assigned name doesn't resolve to
+    //    an existing pillar, fall back to cosine match (lenient threshold) so
+    //    the video isn't orphaned by a hallucinated name.
     const videoIds = ready.map(t => t.video_id).filter(Boolean);
     if (videoIds.length > 0) {
         const { error: clearErr } = await supabase
@@ -282,27 +313,49 @@ export async function regeneratePillarsForUser(options: RegenerateOptions): Prom
 
     const { data: refreshedPillars } = await supabase
         .from('pillars')
-        .select('id, embedding')
+        .select('id, name, embedding')
         .eq('user_id', userId)
         .not('embedding', 'is', null);
 
-    const pillarVectors: Array<{ id: string; embedding: number[] }> = [];
+    const pillarVectors: Array<{ id: string; name: string; embedding: number[] }> = [];
+    const pillarsByLowerName = new Map<string, string>();
     for (const p of refreshedPillars || []) {
         const emb = parseEmbedding(p.embedding);
-        if (emb) pillarVectors.push({ id: p.id as string, embedding: emb });
+        if (emb) {
+            const id = p.id as string;
+            const name = p.name as string;
+            pillarVectors.push({ id, name, embedding: emb });
+            pillarsByLowerName.set(name.trim().toLowerCase(), id);
+        }
     }
 
     const newTags: { video_id: string; pillar_id: string }[] = [];
     const taggedPillarIds = new Set<string>();
-    for (const t of ready) {
-        let best: { id: string; sim: number } | null = null;
-        for (const p of pillarVectors) {
-            const sim = cosineSimilarity(t.embedding, p.embedding);
-            if (!best || sim > best.sim) best = { id: p.id, sim };
+    for (let i = 0; i < ready.length; i++) {
+        const t = ready[i];
+        const assignedName = assignments[i];
+        let resolvedPillarId: string | null = null;
+
+        if (assignedName) {
+            resolvedPillarId = pillarsByLowerName.get(assignedName.trim().toLowerCase()) || null;
         }
-        if (best && best.sim >= REGEN_TAG_THRESHOLD) {
-            newTags.push({ video_id: t.video_id, pillar_id: best.id });
-            taggedPillarIds.add(best.id);
+
+        if (!resolvedPillarId) {
+            // Cosine fallback for null/hallucinated assignments. Same lenient
+            // threshold the old code used for batch re-tag.
+            let best: { id: string; sim: number } | null = null;
+            for (const p of pillarVectors) {
+                const sim = cosineSimilarity(t.embedding, p.embedding);
+                if (!best || sim > best.sim) best = { id: p.id, sim };
+            }
+            if (best && best.sim >= REGEN_TAG_THRESHOLD) {
+                resolvedPillarId = best.id;
+            }
+        }
+
+        if (resolvedPillarId) {
+            newTags.push({ video_id: t.video_id, pillar_id: resolvedPillarId });
+            taggedPillarIds.add(resolvedPillarId);
         }
     }
 

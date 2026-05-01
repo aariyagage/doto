@@ -20,9 +20,9 @@ Every video runs through `tagOrCreatePillarsForVideo`:
 
 | Cosine similarity (top match) | Action |
 | --- | --- |
-| ≥ 0.55 | Fast tag into the matching pillar, no LLM call. Multi-tag if a second pillar also scores ≥ 0.72 AND is within 0.05 of top-1. |
-| 0.30 – 0.55 | LLM decides: tag into one of the existing pillars OR propose a new pillar with a BROAD name. |
-| < 0.30 | LLM proposes a new pillar (since no existing pillar fits). New proposals go through the 0.78 embedding-dedup gate to catch near-duplicates of pillars that didn't make the cosine top-N. |
+| ≥ 0.78 | Fast tag into the matching pillar, no LLM call. Multi-tag if a second pillar also scores ≥ 0.78 AND is within 0.04 of top-1. |
+| 0.15 – 0.78 | LLM decides: tag into one of the existing pillars OR propose a new pillar with a BROAD name. |
+| < 0.15 | LLM still gets called (with no top candidates) so it can see the full pillar list before deciding "new". New proposals go through the 0.82 embedding-dedup gate to catch near-duplicates of pillars that didn't make the cosine top-N. |
 
 The LLM call always sees the **full pillar list** with descriptions, not just cosine top-N — this catches duplicates of pillars that the cosine query missed. The prompt has strong reuse bias: "Default to tag if any existing pillar is a reasonable home." When proposing new, names must be 1-3 words BROAD ("Vlogs", "Productivity", "Cultural Commentary") — never narrow qualifiers ("College Life", "Female Voice", "Brand X Reviews").
 
@@ -159,8 +159,8 @@ All thresholds chosen for MiniLM-L6-v2 on 200-400 char inputs. Should be revisit
 
 | Constant | Value | Where | Meaning |
 | --- | --- | --- | --- |
-| `TAG_FAST_THRESHOLD` | 0.55 | tag-or-create | Cosine ≥ this → auto-tag, no LLM. |
-| `TAG_AMBIGUOUS_FLOOR` | 0.30 | tag-or-create | Below this → straight to "new pillar?" path. |
+| `TAG_FAST_THRESHOLD` | 0.78 | tag-or-create | Cosine ≥ this → auto-tag, no LLM. Bumped from 0.55 because MiniLM-L6-v2 cosine on essences from a single creator's voice clusters at 0.55-0.65 even across topics — too lenient meant every reflective video got fast-tagged into the first pillar created. |
+| `TAG_AMBIGUOUS_FLOOR` | 0.15 | tag-or-create | LLM gets called on every match above this floor. Lower bound is intentionally low so the LLM can still see all existing pillars (via the full-pillar-list block) on weak matches and dedup against pillars that didn't make the cosine top-N. |
 | `TAG_SECOND_PILLAR_THRESHOLD` | 0.60 | tag-or-create | Multi-tag bar — slightly higher than fast tag to avoid noise. |
 | `PILLAR_DEDUP_COSINE_THRESHOLD` | 0.78 | dedup (used in tag-or-create + series + manual) | Above this, treat as same pillar even if names differ. |
 | `BOOTSTRAP_TAG_THRESHOLD` | 0.40 | bootstrap | Lenient — pillars derive from these very essences. |
@@ -192,7 +192,7 @@ Every tag path now appends a subtopic to `pillars.subtopics` so the idea generat
 
 | Path | Subtopic source |
 | --- | --- |
-| `tag-or-create` fast-tag (cosine ≥ 0.55) | `transcripts.essence_topic` (v2 only — undefined on pre-v2 transcripts, append no-ops) |
+| `tag-or-create` fast-tag (cosine ≥ 0.78) | `transcripts.essence_topic` (v2 only — undefined on pre-v2 transcripts, append no-ops) |
 | `tag-or-create` LLM band | The LLM-extracted `subtopic` field from the tag decision |
 | `series-detector` (per-upload) | `transcripts.essence_topic` for the video being detected |
 | `bootstrap` | The full subtopic list comes back from the bootstrap LLM proposal — no per-video append needed |

@@ -4,18 +4,28 @@ import { findSimilarPillars, findClosestPillar, PILLAR_DEDUP_COSINE_THRESHOLD, t
 import { getCombo } from '@/lib/colors';
 import type { SupabaseServer } from './types';
 
-// Cosine thresholds. With BROAD pillars, same-territory essences typically
-// score 0.45-0.65 against the umbrella pillar. We tag aggressively and let the
-// LLM (which sees the full pillar list + descriptions) make the close calls.
-const TAG_FAST_THRESHOLD = 0.55;       // strong match: tag without LLM
-const TAG_AMBIGUOUS_FLOOR = 0.30;      // below this we go straight to "new pillar?"
+// Cosine thresholds. The previous 0.55 fast-tag floor was too lenient for
+// MiniLM-L6-v2 on essences from a single creator's voice — a personal
+// monologue about creativity and a personal monologue about routine both
+// score ~0.55-0.65 against any pillar derived from another personal
+// monologue, because the model picks up on shared register and tone before
+// topic. That caused the "everything fast-tagged to the first pillar
+// created" failure mode (every reflective video → "Creative Thinking").
+// 0.78 means the new video is essentially the same topic + tone as material
+// already in the pillar — safe to skip the LLM. Anything below 0.78 goes
+// through the LLM, which can read the actual content and judge format/topic
+// distinction (a vlog vs an essay vs commentary).
+const TAG_FAST_THRESHOLD = 0.78;
+// LLM gets called on every match above this floor. The floor is low (0.15)
+// so even weak cosine matches still let the LLM see the full pillar list
+// and dedup against any pillar that didn't make the cosine top-N.
+const TAG_AMBIGUOUS_FLOOR = 0.15;
 // Multi-tag is rare on purpose: a video should usually live in one pillar.
-// We only tag against a 2nd pillar when (a) the 2nd is itself a strong match,
-// AND (b) the gap between #1 and #2 is small — meaning the video is genuinely
-// straddling two territories, not just leaking signal into a tangentially
-// related pillar.
-const TAG_SECOND_PILLAR_THRESHOLD = 0.72;
-const TAG_SECOND_PILLAR_GAP = 0.05;
+// Only tag against a 2nd pillar when (a) it's also a strong match AND (b)
+// the gap to top-1 is tiny — meaning the video is genuinely straddling two
+// territories, not leaking voice signal into a tangentially related pillar.
+const TAG_SECOND_PILLAR_THRESHOLD = 0.78;
+const TAG_SECOND_PILLAR_GAP = 0.04;
 
 interface TagOrCreateArgs {
     supabase: SupabaseServer;
@@ -53,54 +63,61 @@ async function decideTagOrCreate(
         messages: [
             {
                 role: 'system',
-                content: `You decide which content pillar (folder) a new video belongs in. Either it fits an existing pillar (tag it there) or it's a genuinely different domain (create a new pillar with a BROAD name).
+                content: `You decide which content pillar (folder) a new video belongs in. Either it genuinely fits an existing pillar (tag it there) or it's a different topic / different format and needs its own pillar (create a new one with a BROAD name).
 
-CRITICAL: STRONG bias toward reuse. Default to "tag" if any existing pillar is a reasonable home — even if the fit is loose. Only propose "new" when the video's domain is fundamentally different from EVERY existing pillar.
+KEY PRINCIPLE: a pillar is a folder. A video belongs in a folder when it shares the SAME TOPIC and SAME FORMAT as content already in that folder. Same creator, same speaking style, same tone — these are NOT enough to share a folder. The TOPIC must match.
 
-Examples of CORRECT reuse (these MUST tag, never create new):
-- existing "Productivity" + video about "time blocking" → tag to Productivity
-- existing "Productivity" + video about "morning routine" → tag to Productivity
-- existing "Productivity" + video about "life maxxing" → tag to Productivity
-- existing "Beauty" + video about "lipstick swatches" → tag to Beauty
+How to decide:
+- Look at the video's TOPIC (what it's about) and FORMAT (vlog, essay, commentary, tutorial, reaction, etc.).
+- Look at each existing pillar's NAME and DESCRIPTION.
+- Tag if the video belongs in that folder by topic AND format.
+- Otherwise create a new pillar with a broad 1-3 word name.
+
+CORRECT reuse (same topic + format as existing pillar):
+- existing "Productivity" + video about "time blocking" → tag to Productivity (same topic)
+- existing "Vlogs" + video about "a day in my life on campus" → tag to Vlogs (same format)
+- existing "Vlogs" + video about "weekend trip with friends" → tag to Vlogs (same format)
+- existing "Cultural Commentary" + video about "AI and originality" → tag to Cultural Commentary (same domain)
+- existing "Cultural Commentary" + video about "female voices on the internet" → tag to Cultural Commentary
 - existing "Beauty" + video about "skincare routine" → tag to Beauty
-- existing "Daily Life" + video about "a day in college" → tag to Daily Life
-- existing "Daily Life" + video about "study routine" → tag to Daily Life
-- existing "Daily Life" + video about "weekend in the city" → tag to Daily Life
-- existing "Founder Diaries" + video about "pricing experiment" → tag to Founder Diaries
 
-Examples where "new" is correct (genuinely different domain):
-- only "Productivity" exists + video about "budget meal prep" → new "Cooking" or "Food"
-- only "Beauty" exists + video about "Q1 revenue review" → new "Founder Diaries"
-- only "Vlogs" exists + video about "AI and originality" → new "Cultural Commentary"
-- (no pillars exist yet) + ANY video → new (use a broad name like "Vlogs", "Productivity", "Cultural Commentary")
+CORRECT new (different topic OR different format from any existing):
+- existing "Creative Thinking" + video about "a chill day in college" → new "Vlogs" (different format — that's a vlog, not an essay on creativity)
+- existing "Creative Thinking" + video about "memory and how childhood felt longer" → new "Cultural Commentary" or "Reflections" (different topic)
+- existing "Creative Thinking" + video about "luxury of choice in life" → new "Personal Growth" or "Mindset" (different topic)
+- existing "Vlogs" + video on "AI and the death of originality" → new "Cultural Commentary" (different format AND topic)
+- existing "Productivity" + video about "Q1 revenue" → new "Founder Diaries"
+- (no pillars exist yet) + ANY video → new (use a broad name like "Vlogs", "Cultural Commentary", "Productivity")
 
-NEW PILLAR NAMING RULES (when proposing "new"):
+CRITICAL ANTI-PATTERN: Do NOT tag a video to an existing pillar just because the creator's voice/tone is similar. A reflective vlog is not the same as a reflective essay on creativity. A motivational pep talk is not the same as a piece of cultural commentary. Different topic = different pillar. When in doubt, propose "new" with a broad name.
+
+NEW PILLAR NAMING RULES:
 - 1-3 words. Title Case. Broad enough to host future videos in the same vein.
-- ✅ "Vlogs", "Productivity", "Beauty", "Cultural Commentary", "Founder Diaries", "Daily Life", "Cooking", "Creative Thinking"
+- ✅ "Vlogs", "Productivity", "Beauty", "Cultural Commentary", "Founder Diaries", "Daily Life", "Cooking", "Creative Thinking", "Personal Growth", "Reflections"
 - ❌ "College Life" (a college vlog is just "Daily Life" or "Vlogs")
 - ❌ "Female Voice" (a video discussing women's voices online is just "Cultural Commentary")
 - ❌ "Brand X Reviews" (one product mentioned doesn't justify a Brand X pillar — it's "Beauty" or "Reviews")
 - ❌ "Morning Routines" (that's a subtopic of "Productivity")
 
-When proposing "tag", also extract the specific subtopic this video covers (1-3 words, e.g. "time blocking", "college life", "female voices online"). When proposing "new", leave subtopic empty — the broad pillar can accumulate subtopics later.
+When proposing "tag", also extract the specific subtopic this video covers (1-3 words, e.g. "time blocking", "weekend trip", "female voices online"). When proposing "new", leave subtopic empty — the broad pillar can accumulate subtopics later.
 
 Return only valid JSON.`,
             },
             {
                 role: 'user',
-                content: `ALL of the creator's existing pillars (you must tag against one of these unless the video is a fundamentally different domain):
-${fullPillarList || '(none yet — propose new with a BROAD name)'}
+                content: `Existing pillars (these are the ONLY folders you can tag into — if none of them genuinely fit this video by topic + format, propose "new"):
+${fullPillarList || '(none yet — you MUST propose "new" with a broad name)'}
 
-Top semantic matches for this new video:
+Top semantic matches for this new video (cosine similarity in brackets — note: similarity in this score range does NOT mean topical match; it usually just means same creator voice. Look at the actual essence below to decide):
 ${candidatesBlock || '(no close matches)'}
 
-New video essence:
+New video essence (format is "topic // angle // takeaway" — the topic is the most important signal for which folder it belongs in):
 ${essence}
 
 Return ONE of these JSON shapes:
 { "decision": "tag", "pillar_name": "<EXACT existing name>", "subtopic": "<1-3 words: the specific topic this video covers under that pillar>" }
 OR
-{ "decision": "new", "name": "<1-3 words, BROAD — distinct domain from all existing>", "description": "<one sentence>" }`,
+{ "decision": "new", "name": "<1-3 words, BROAD — different topic OR format from all existing>", "description": "<one sentence>" }`,
             },
         ],
     });

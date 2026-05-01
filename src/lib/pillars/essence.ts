@@ -2,9 +2,10 @@ import type Groq from 'groq-sdk';
 import { embedText } from './embeddings';
 import type { SupabaseServer } from './types';
 
-const ESSENCE_MAX = 360;
+const ESSENCE_MAX = 480;
 const ESSENCE_INPUT_CAP = 12_000;
 
+const TOPIC_MAX = 80;
 const CORE_IDEA_MAX = 160;
 const HOOK_MAX = 100;
 const TAKEAWAY_MAX = 160;
@@ -50,6 +51,7 @@ export async function generateEssence(transcriptText: string, groq: Groq): Promi
 }
 
 export type EssenceV2 = {
+    topic: string;       // concrete subject of the video (2-6 words). Anchors topical signal so pillar tagging doesn't collapse under angle-only abstraction.
     core_idea: string;   // the angle — must include a specific mechanism, scenario, or perspective
     hook: string | null; // the literal opening line if present, else null
     takeaway: string;    // what the viewer leaves with
@@ -69,7 +71,17 @@ export async function generateEssenceV2(transcriptText: string, groq: Groq): Pro
                 role: 'system',
                 content: [
                     'You index a creator\'s video transcripts for an idea-generation system.',
-                    'Return JSON with three fields: core_idea, hook, takeaway.',
+                    'Return JSON with four fields: topic, core_idea, hook, takeaway.',
+                    '',
+                    'topic (≤80 chars): the concrete SUBJECT of the video as a 2-6 word noun phrase. Plain and topical — the domain the video lives in, not the argument it makes. This is what gets matched against content pillars.',
+                    '  ❌ "the importance of being yourself" (that\'s a stance, not a topic)',
+                    '  ✅ "creativity and originality"',
+                    '  ❌ "things that matter in life"',
+                    '  ✅ "saving content online"',
+                    '  ❌ "interesting observations"',
+                    '  ✅ "childhood time perception"',
+                    '  ✅ "morning routines"',
+                    '  ✅ "founder pricing experiments"',
                     '',
                     'core_idea (≤160 chars): the ANGLE of the video, not the topic. It MUST name a specific mechanism, scenario, or perspective — not a general claim.',
                     '  ❌ "people struggle with productivity because they lack discipline"',
@@ -86,23 +98,26 @@ export async function generateEssenceV2(transcriptText: string, groq: Groq): Pro
             },
             {
                 role: 'user',
-                content: `Transcript:\n${input}\n\nReturn JSON: { "core_idea": string, "hook": string | null, "takeaway": string }`,
+                content: `Transcript:\n${input}\n\nReturn JSON: { "topic": string, "core_idea": string, "hook": string | null, "takeaway": string }`,
             },
         ],
     });
 
     const raw = stripCodeFences(completion.choices[0]?.message?.content || '');
-    const parsed = JSON.parse(raw) as { core_idea?: unknown; hook?: unknown; takeaway?: unknown };
+    const parsed = JSON.parse(raw) as { topic?: unknown; core_idea?: unknown; hook?: unknown; takeaway?: unknown };
 
+    const topic = typeof parsed.topic === 'string' ? parsed.topic.trim() : '';
     const core_idea = typeof parsed.core_idea === 'string' ? parsed.core_idea.trim() : '';
     const takeaway = typeof parsed.takeaway === 'string' ? parsed.takeaway.trim() : '';
     const hookRaw = typeof parsed.hook === 'string' ? parsed.hook.trim() : '';
     const hook = hookRaw && hookRaw.toLowerCase() !== 'null' ? hookRaw : null;
 
+    if (!topic) throw new Error('Essence v2 missing topic.');
     if (!core_idea) throw new Error('Essence v2 missing core_idea.');
     if (!takeaway) throw new Error('Essence v2 missing takeaway.');
 
     return {
+        topic: topic.length > TOPIC_MAX ? topic.slice(0, TOPIC_MAX) : topic,
         core_idea: core_idea.length > CORE_IDEA_MAX ? core_idea.slice(0, CORE_IDEA_MAX) : core_idea,
         hook: hook && hook.length > HOOK_MAX ? hook.slice(0, HOOK_MAX) : hook,
         takeaway: takeaway.length > TAKEAWAY_MAX ? takeaway.slice(0, TAKEAWAY_MAX) : takeaway,
@@ -110,10 +125,13 @@ export async function generateEssenceV2(transcriptText: string, groq: Groq): Pro
 }
 
 // Concat used as the legacy `essence` column when v2 is on. Pillar tagging
-// matches against essence_embedding, so we want this string to carry both the
-// angle and the upshot — that's what makes a transcript semantically findable.
+// matches against essence_embedding, so we want this string to carry topical
+// signal first (so videos cluster by domain) followed by the angle + upshot.
+// Topic-leading layout restores the per-video separation that pure angle/takeaway
+// essences lost — without it, every reflective video embeds close enough to
+// auto-tag into one umbrella pillar like "Personal Growth".
 function composeLegacyEssence(parts: EssenceV2): string {
-    const concat = `${parts.core_idea} — ${parts.takeaway}`;
+    const concat = `${parts.topic} // ${parts.core_idea} // ${parts.takeaway}`;
     return concat.length > ESSENCE_MAX ? concat.slice(0, ESSENCE_MAX) : concat;
 }
 

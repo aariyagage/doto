@@ -191,10 +191,15 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
     }, [tasks, processTask])
 
     // Enrich completed tasks with transcript + pillars (display-only data).
+    // Note the `pillars !== undefined` guard (vs truthy check): we explicitly
+    // reset pillars to undefined elsewhere when a later upload's bootstrap may
+    // have retroactively tagged this video, and that reset is what triggers a
+    // re-fetch. An empty array (`[]`) is treated as "fetched, none yet" and
+    // keeps the effect from looping.
     useEffect(() => {
         tasks.forEach(async (task) => {
             if (task.status !== 'done' || !task.videoId) return
-            if (task.transcript && task.pillars) return
+            if (task.transcript && task.pillars !== undefined) return
             if (task.errorMessage) return
 
             try {
@@ -236,6 +241,35 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
             }
         })
     }, [tasks, supabase, updateTask])
+
+    // When a task transitions to `done`, the bootstrap that just fired may have
+    // retroactively tagged earlier videos (the very first upload starts with
+    // pillars=[] because pillar formation defers until the 2nd transcript). Reset
+    // pillars to undefined on prior done tasks with empty pillars so the
+    // enrichment effect re-fetches and picks up the freshly attached tags.
+    const prevDoneIdsRef = useRef<Set<string>>(new Set())
+    useEffect(() => {
+        const currentDoneIds = new Set(tasks.filter(t => t.status === 'done').map(t => t.id))
+        let hasNewlyDone = false
+        for (const id of currentDoneIds) {
+            if (!prevDoneIdsRef.current.has(id)) {
+                hasNewlyDone = true
+                break
+            }
+        }
+        prevDoneIdsRef.current = currentDoneIds
+        if (!hasNewlyDone) return
+        const stale = tasks.filter(t =>
+            t.status === 'done' &&
+            t.transcript !== undefined &&
+            Array.isArray(t.pillars) &&
+            t.pillars.length === 0,
+        )
+        if (stale.length === 0) return
+        setTasks(prev => prev.map(t =>
+            stale.find(s => s.id === t.id) ? { ...t, pillars: undefined } : t,
+        ))
+    }, [tasks])
 
     // Keep the completedCount summary fresh so other parts of the app can read it.
     const refreshCompletedCount = useCallback(async () => {

@@ -104,13 +104,16 @@ Documented in detail at `docs/pillar-system.md`. Summary: bootstrap on the 2nd t
 
 **Why:** the PRD §7 calls out essence quality as upstream of everything. v1 output drifted to topic-only.
 
-**What:** behind `IDEA_ENGINE_V2=true`, `generateEssenceV2` returns three structured fields instead of one paragraph:
+**What:** behind `IDEA_ENGINE_V2=true`, `generateEssenceV2` returns four structured fields instead of one paragraph:
 
 | Field | Constraint | Rule |
 | --- | --- | --- |
+| `topic` | ≤80 chars | The concrete **subject** of the video as a 2-6 word noun phrase. Anchors topical signal so pillar tagging doesn't collapse abstract angles into one umbrella. |
 | `core_idea` | ≤160 chars | The **angle** of the video. MUST include a specific mechanism, scenario, or perspective — not a general claim. |
 | `hook` | ≤100 chars or `null` | The literal opening line if it functions as a hook; `null` if the transcript opens with filler. |
 | `takeaway` | ≤160 chars | What the viewer is supposed to walk away believing or doing. |
+
+**Why `topic` was added (after Phase 1 shipped):** the original v2 essence stored the legacy column as `core_idea — takeaway` — angle-and-upshot only. In production this collapsed pillar tagging: every reflective video embeds in roughly the same abstract region of MiniLM space, so bootstrap proposed one umbrella ("Personal Growth") and `TAG_FAST_THRESHOLD=0.55` auto-tagged every later upload into it. Topic-leading essences (`topic // core_idea // takeaway`) restore per-video topical separation without changing any pillar thresholds.
 
 The prompt anchors `core_idea` quality with a bad/good example pair baked in:
 
@@ -118,9 +121,10 @@ The prompt anchors `core_idea` quality with a bad/good example pair baked in:
 > ✅ "people fail at productivity because they rely on motivation instead of reducing decisions"
 
 Persistence:
-- New columns: `essence_core_idea`, `essence_hook`, `essence_takeaway`, `hook_embedding`.
-- Legacy `essence` column keeps getting populated as `core_idea — takeaway` so pillar tagging (which reads `essence_embedding`) keeps working unchanged.
+- New columns: `essence_core_idea`, `essence_hook`, `essence_takeaway`, `hook_embedding`. (`topic` is currently captured into the legacy `essence` column only — no dedicated column yet.)
+- Legacy `essence` column keeps getting populated as `topic // core_idea // takeaway` so pillar tagging (which reads `essence_embedding`) carries topical signal again.
 - `hook_embedding` is computed only when `hook` is non-null.
+- `ESSENCE_MAX` is 480 chars to fit topic + core_idea + takeaway with separators; well under MiniLM's ~1000-char limit.
 
 ### 2. Voice profile v2 — structured rhetoric
 
@@ -494,7 +498,7 @@ Pure UI / API surface, no further migration:
 
 ## Known issues / open questions
 
-- **Pillar formation breadth** — bootstrap currently demands broad pillars. For multi-mode creators (thought pieces + productivity + vlogs in one account), this collapses distinct content territories under a single umbrella like "Personal Growth," and out-of-territory videos can land Uncategorized. Documented for future work; outside Phase 1 scope.
+- **Pillar formation breadth** — bootstrap currently demands broad pillars. For multi-mode creators (thought pieces + productivity + vlogs in one account), this can still collapse distinct content territories under a single umbrella like "Personal Growth." The topic-leading essence (added post-Phase-1) restored most of the per-video separation that pure angle/takeaway essences had erased, but the underlying threshold/prompt design hasn't been revisited.
 - **Voice profile coherence** — when an account's transcripts represent multiple creator personas (e.g. test data from different sources), the voice profile averages them. Not a bug; a property of the design.
 - **Free-tier rate limits** — `videoProcess: 5/10min`, `llmGeneration: 10/min` (`src/lib/rate-limit.ts:45-50`). Not specific to v2 but worth knowing during testing.
 - **Idempotency lock-out** — existing v1 essences won't be re-generated under v2. If you want a clean v2 test, upload fresh videos rather than expecting old transcripts to upgrade.

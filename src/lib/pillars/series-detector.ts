@@ -38,9 +38,10 @@ export async function detectSeriesSignals(transcript: string, groq: Groq): Promi
 CRITICAL — series_name extraction rules:
 - Extract ONLY the name. NOT the framing words around it.
 - Title Case. 2 to 5 words. No more.
+- KEEP apostrophes in contractions ("I've", "don't", "we're", "it's"). A contraction counts as ONE word, not two. Never write "I've" as "I ve" or "Ive".
 - Strip leading "my", "the", "a", "this".
 - Strip trailing words like "series", "diaries", "saturdays", "videos" UNLESS they're inseparable from the name (creators often say "my X series" — keep just X unless X alone makes no sense).
-- Strip explanatory phrases. The creator might say "welcome to my series where I talk about things I've been thinking about" — the NAME there is "Things I've Been Thinking About", not the entire framing sentence.
+- Strip explanatory phrases. The creator might say "welcome to my series where I talk about things I've been thinking about" — the NAME there is "Things I've Been Thinking About" (5 words), not the entire framing sentence.
 
 Examples:
 - "welcome to my series where I talk about things I've been thinking about" → "Things I've Been Thinking About"
@@ -68,8 +69,23 @@ Return only valid JSON.`,
     if (typeof parsed.series_name === 'string' && parsed.series_name.trim()) {
         // Defensive trimming in case the LLM ignores the prompt rules and returns
         // a long phrase. Cap at 5 words / 50 chars; if it's longer, refuse rather
-        // than persist a bad pillar name.
-        const cleaned = parsed.series_name.trim().replace(/^(my|the|a|this)\s+/i, '');
+        // than persist a bad pillar name. Restore apostrophes in common
+        // contractions first — LLMs occasionally drop them ("I ve", "Ive",
+        // "dont"), which inflates the word count and would corrupt the stored
+        // name (e.g. "Things I've Been Thinking About" rendering as
+        // "Things I Ve Been").
+        const restored = parsed.series_name
+            .trim()
+            .replace(/\bI\s+ve\b/gi, "I've")
+            .replace(/\bIve\b/g, "I've")
+            .replace(/\bdon\s+t\b/gi, "don't")
+            .replace(/\bdont\b/gi, "don't")
+            .replace(/\bwe\s+re\b/gi, "we're")
+            .replace(/\bit\s+s\b/gi, "it's")
+            .replace(/\byou\s+re\b/gi, "you're")
+            .replace(/\bcan\s+t\b/gi, "can't")
+            .replace(/\bwon\s+t\b/gi, "won't");
+        const cleaned = restored.replace(/^(my|the|a|this)\s+/i, '');
         const wordCount = cleaned.split(/\s+/).length;
         if (wordCount <= 5 && cleaned.length <= 50) {
             seriesName = cleaned;

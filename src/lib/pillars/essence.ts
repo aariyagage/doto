@@ -106,21 +106,31 @@ export async function generateEssenceV2(transcriptText: string, groq: Groq): Pro
     const raw = stripCodeFences(completion.choices[0]?.message?.content || '');
     const parsed = JSON.parse(raw) as { topic?: unknown; core_idea?: unknown; hook?: unknown; takeaway?: unknown };
 
-    const topic = typeof parsed.topic === 'string' ? parsed.topic.trim() : '';
+    const topicRaw = typeof parsed.topic === 'string' ? parsed.topic.trim() : '';
     const core_idea = typeof parsed.core_idea === 'string' ? parsed.core_idea.trim() : '';
     const takeaway = typeof parsed.takeaway === 'string' ? parsed.takeaway.trim() : '';
     const hookRaw = typeof parsed.hook === 'string' ? parsed.hook.trim() : '';
     const hook = hookRaw && hookRaw.toLowerCase() !== 'null' ? hookRaw : null;
 
-    if (!topic) throw new Error('Essence v2 missing topic.');
+    // core_idea is the only truly mandatory field — it's the angle the rest of
+    // the pipeline anchors on. Everything else has a fallback so a single
+    // missing field can never block essence persistence (which would in turn
+    // cascade into pillar tagging + series detection both being skipped for
+    // the video).
     if (!core_idea) throw new Error('Essence v2 missing core_idea.');
-    if (!takeaway) throw new Error('Essence v2 missing takeaway.');
+
+    // topic falls back to a truncated core_idea. This still gives pillar
+    // tagging meaningful topical signal even when Groq drops the field.
+    const topic = topicRaw || core_idea.slice(0, TOPIC_MAX).trim();
+    // takeaway falls back to core_idea too; better than nothing in the legacy
+    // essence concat that drives pillar embeddings.
+    const safeTakeaway = takeaway || core_idea;
 
     return {
         topic: topic.length > TOPIC_MAX ? topic.slice(0, TOPIC_MAX) : topic,
         core_idea: core_idea.length > CORE_IDEA_MAX ? core_idea.slice(0, CORE_IDEA_MAX) : core_idea,
         hook: hook && hook.length > HOOK_MAX ? hook.slice(0, HOOK_MAX) : hook,
-        takeaway: takeaway.length > TAKEAWAY_MAX ? takeaway.slice(0, TAKEAWAY_MAX) : takeaway,
+        takeaway: safeTakeaway.length > TAKEAWAY_MAX ? safeTakeaway.slice(0, TAKEAWAY_MAX) : safeTakeaway,
     };
 }
 

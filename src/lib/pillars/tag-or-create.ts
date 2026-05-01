@@ -184,6 +184,7 @@ export async function tagOrCreatePillarsForVideo(
     const essenceEmbedding = parseEmbedding(transcript.essence_embedding);
     const transcriptTopic = (transcript.essence_topic as string | null) || undefined;
     if (!essence || !essenceEmbedding) {
+        console.warn(`tag-or-create video=${videoId}: missing essence or embedding, leaving untagged`);
         result.untagged = true;
         return result;
     }
@@ -191,6 +192,7 @@ export async function tagOrCreatePillarsForVideo(
     // 2. Cosine match against the user's existing pillars.
     const matches = await findSimilarPillars(supabase, userId, essenceEmbedding, TAG_AMBIGUOUS_FLOOR);
     const top = matches[0];
+    console.log(`tag-or-create video=${videoId}: top cosine match = ${top ? `${top.name} (${top.similarity.toFixed(3)})` : 'none above floor'}`);
 
     // 3. Strong match → tag fast, no LLM call. We pass the v2-essence topic
     //    so subtopics still accumulate without a Groq call. Pre-v2 transcripts
@@ -198,6 +200,7 @@ export async function tagOrCreatePillarsForVideo(
     if (top && top.similarity >= TAG_FAST_THRESHOLD) {
         await tagVideoToPillar(supabase, videoId, top.id, transcriptTopic);
         result.tagged.push(top.id);
+        console.log(`tag-or-create video=${videoId}: fast-tagged to ${top.name}`);
         const second = matches[1];
         if (
             second &&
@@ -206,14 +209,14 @@ export async function tagOrCreatePillarsForVideo(
         ) {
             await tagVideoToPillar(supabase, videoId, second.id, transcriptTopic);
             result.tagged.push(second.id);
+            console.log(`tag-or-create video=${videoId}: also multi-tagged to ${second.name}`);
         }
         return result;
     }
 
-    // 4. Ambiguous band (cosine < 0.55) OR no existing pillars at all. Ask the
-    //    LLM to pick an existing pillar OR propose a new BROAD one. The full
-    //    pillar list goes in so the LLM doesn't dupe a pillar that didn't make
-    //    the cosine top-N.
+    // 4. Ambiguous band OR no existing pillars at all. Ask the LLM to pick an
+    //    existing pillar OR propose a new BROAD one. Pulls full pillar list so
+    //    the LLM can't dupe a pillar that didn't make the cosine top-N.
     const { data: allPillarsRaw } = await supabase
         .from('pillars')
         .select('id, name, description')
@@ -224,21 +227,29 @@ export async function tagOrCreatePillarsForVideo(
         description: (r.description as string | null) || null,
     }));
 
+    // Local helper so every fallback path uses the same lenient cosine rescue.
+    // If we have ANY cosine match above the ambiguous floor, that pillar is a
+    // better home than Uncategorized — use it instead of dropping the video.
+    const cosineFallback = async (subtopicHint?: string): Promise<boolean> => {
+        if (top && top.similarity >= TAG_AMBIGUOUS_FLOOR) {
+            await tagVideoToPillar(supabase, videoId, top.id, subtopicHint || transcriptTopic);
+            result.tagged.push(top.id);
+            console.log(`tag-or-create video=${videoId}: cosine-fallback-tagged to ${top.name}`);
+            return true;
+        }
+        return false;
+    };
+
     let decision: LlmTagDecision;
     try {
         decision = await decideTagOrCreate(essence, matches, allPillars, groq);
     } catch (err) {
-        console.error('tag-or-create LLM decision failed:', err);
-        // Fall back to cosine top match if it cleared the ambiguous floor;
-        // otherwise leave untagged.
-        if (top && top.similarity >= TAG_AMBIGUOUS_FLOOR) {
-            await tagVideoToPillar(supabase, videoId, top.id, transcriptTopic);
-            result.tagged.push(top.id);
-            return result;
-        }
+        console.error(`tag-or-create video=${videoId}: LLM decision threw, trying cosine fallback:`, err);
+        if (await cosineFallback()) return result;
         result.untagged = true;
         return result;
     }
+    console.log(`tag-or-create video=${videoId}: LLM decision = ${decision.decision}${decision.pillar_name ? ` → ${decision.pillar_name}` : ''}${decision.name ? ` → new "${decision.name}"` : ''}`);
 
     if (decision.decision === 'tag' && decision.pillar_name) {
         const matched = allPillars.find(
@@ -247,82 +258,87 @@ export async function tagOrCreatePillarsForVideo(
         if (matched) {
             await tagVideoToPillar(supabase, videoId, matched.id, decision.subtopic || transcriptTopic);
             result.tagged.push(matched.id);
+            console.log(`tag-or-create video=${videoId}: LLM-tagged to ${matched.name}`);
             return result;
         }
-        // LLM intended "tag" but spelled the pillar name wrong. Fall back to
-        // the closest cosine match if it's above the ambiguous floor.
-        if (top && top.similarity >= TAG_AMBIGUOUS_FLOOR) {
-            await tagVideoToPillar(supabase, videoId, top.id, decision.subtopic || transcriptTopic);
-            result.tagged.push(top.id);
-            return result;
-        }
+        // LLM intended "tag" but spelled the pillar name wrong. Cosine fallback.
+        if (await cosineFallback(decision.subtopic)) return result;
     }
 
     if (decision.decision === 'new' && decision.name && decision.description) {
         const proposalName = decision.name.trim();
         const proposalDesc = decision.description.trim();
-        if (!proposalName || !proposalDesc) {
-            result.untagged = true;
-            return result;
+        if (proposalName && proposalDesc) {
+            // Embed + dedup. If the LLM proposed a name that's semantically the
+            // same as an existing pillar (≥ PILLAR_DEDUP_COSINE_THRESHOLD), tag
+            // against the existing one rather than spawning a near-duplicate.
+            let proposalEmbedding: number[] | null = null;
+            try {
+                proposalEmbedding = await embedText(`${proposalName}. ${proposalDesc}`);
+            } catch (err) {
+                console.error(`tag-or-create video=${videoId}: proposal embedding failed:`, err);
+            }
+
+            if (proposalEmbedding) {
+                const dup = await findClosestPillar(supabase, userId, proposalEmbedding, PILLAR_DEDUP_COSINE_THRESHOLD);
+                if (dup) {
+                    await tagVideoToPillar(supabase, videoId, dup.id, transcriptTopic);
+                    result.tagged.push(dup.id);
+                    console.log(`tag-or-create video=${videoId}: proposal "${proposalName}" deduped to existing ${dup.name}`);
+                    return result;
+                }
+
+                const colorCombo = getCombo(allPillars.length);
+                const { data: inserted, error: insertErr } = await supabase
+                    .from('pillars')
+                    .insert({
+                        user_id: userId,
+                        name: proposalName,
+                        description: proposalDesc,
+                        embedding: proposalEmbedding,
+                        subtopics: transcriptTopic ? [transcriptTopic] : [],
+                        source: 'ai_detected',
+                        source_origin: 'ai_detected',
+                        color: colorCombo.bg,
+                    })
+                    .select('id')
+                    .single();
+
+                let pillarId: string | null = null;
+                if (insertErr) {
+                    const { data: existing } = await supabase
+                        .from('pillars')
+                        .select('id')
+                        .eq('user_id', userId)
+                        .ilike('name', proposalName)
+                        .maybeSingle();
+                    pillarId = existing ? (existing.id as string) : null;
+                } else {
+                    pillarId = inserted!.id as string;
+                    result.created.push(pillarId);
+                    console.log(`tag-or-create video=${videoId}: created new pillar "${proposalName}"`);
+                }
+
+                if (pillarId) {
+                    await tagVideoToPillar(supabase, videoId, pillarId, transcriptTopic);
+                    result.tagged.push(pillarId);
+                    return result;
+                }
+            }
         }
 
-        // Embed + dedup against existing pillars. Belt-and-suspenders for when
-        // the LLM ignores the "don't dupe existing pillars" instruction.
-        let proposalEmbedding: number[];
-        try {
-            proposalEmbedding = await embedText(`${proposalName}. ${proposalDesc}`);
-        } catch (err) {
-            console.error('Proposal embedding failed:', err);
-            result.untagged = true;
-            return result;
-        }
-
-        const dup = await findClosestPillar(supabase, userId, proposalEmbedding, PILLAR_DEDUP_COSINE_THRESHOLD);
-        if (dup) {
-            await tagVideoToPillar(supabase, videoId, dup.id, transcriptTopic);
-            result.tagged.push(dup.id);
-            return result;
-        }
-
-        const colorCombo = getCombo(allPillars.length);
-        const { data: inserted, error: insertErr } = await supabase
-            .from('pillars')
-            .insert({
-                user_id: userId,
-                name: proposalName,
-                description: proposalDesc,
-                embedding: proposalEmbedding,
-                subtopics: transcriptTopic ? [transcriptTopic] : [],
-                source: 'ai_detected',
-                source_origin: 'ai_detected',
-                color: colorCombo.bg,
-            })
-            .select('id')
-            .single();
-
-        let pillarId: string | null = null;
-        if (insertErr) {
-            // Race loser path: fetch by name and tag against the winner.
-            const { data: existing } = await supabase
-                .from('pillars')
-                .select('id')
-                .eq('user_id', userId)
-                .ilike('name', proposalName)
-                .maybeSingle();
-            pillarId = existing ? (existing.id as string) : null;
-        } else {
-            pillarId = inserted!.id as string;
-            result.created.push(pillarId);
-        }
-
-        if (pillarId) {
-            await tagVideoToPillar(supabase, videoId, pillarId, transcriptTopic);
-            result.tagged.push(pillarId);
-            return result;
-        }
+        // New-pillar branch failed (embedding unavailable, insert raced and
+        // race-recovery fetch returned nothing). Try cosine fallback so we
+        // don't lose the video to Uncategorized over an HF outage.
+        if (await cosineFallback()) return result;
     }
 
-    // Nothing landed. Leaves the video untagged so the stale-pillar nudge can fire.
+    // LAST RESORT: every prior path failed. If we have ANY cosine match above
+    // the ambiguous floor, use it. This catches cases where the LLM returned
+    // a malformed decision shape that didn't satisfy either branch above.
+    if (await cosineFallback()) return result;
+
+    console.warn(`tag-or-create video=${videoId}: no path produced a tag, leaving untagged`);
     result.untagged = true;
     return result;
 }

@@ -277,34 +277,52 @@ export async function POST(request: Request) {
                     // Kill switch: set NEW_PILLAR_PIPELINE=false to skip the pillar
                     // block entirely (transcripts still save). Default is on.
                     if (process.env.NEW_PILLAR_PIPELINE !== 'false') {
+                        // Each step is wrapped in its OWN try-catch. A failure in
+                        // essence (e.g. Groq drops a field, HF cold-start beats the
+                        // retry budget) used to skip both tag-or-create AND series
+                        // detection because they all shared one try-catch. That
+                        // produced the "every video Uncategorized + no series
+                        // pillar created" failure mode where one bad LLM call
+                        // silently disabled the whole pipeline. Decoupling means
+                        // an essence failure still lets series detection fire on
+                        // the raw transcript text (which is all it needs).
+
+                        // 1. Per-transcript essence + embedding (idempotent).
+                        let essenceOk = true;
                         try {
-                            // 1. Per-transcript essence + embedding (idempotent).
                             await ensureEssenceForTranscript(supabase, transcriptId, groq);
+                        } catch (err) {
+                            essenceOk = false;
+                            console.error(`pillar-pipeline essence step failed video=${videoId}:`, err);
+                        }
 
-                            // 2. Sort this video into an existing pillar if one fits.
-                            //    No auto-creation: tag-or-create only sorts now,
-                            //    pillar creation is exclusively user-triggered via
-                            //    Discover Pillars on /ideas. The previous bootstrap
-                            //    path (auto-create pillars from the 2nd upload) was
-                            //    removed because 2 videos is too small a sample to
-                            //    define a creator's pillar set, and whichever broad
-                            //    umbrella the LLM picked then anchored every later
-                            //    upload (the "everything → Personal Growth" trap).
-                            await tagOrCreatePillarsForVideo({
-                                supabase, groq, userId: user.id, videoId, transcriptId,
-                            });
+                        // 2. Sort this video into an existing pillar (or create a
+                        //    new BROAD-named one). Skipped only if essence didn't
+                        //    persist — without essence_embedding tag-or-create
+                        //    has nothing to match against.
+                        if (essenceOk) {
+                            try {
+                                await tagOrCreatePillarsForVideo({
+                                    supabase, groq, userId: user.id, videoId, transcriptId,
+                                });
+                            } catch (err) {
+                                console.error(`pillar-pipeline tag-or-create failed video=${videoId}:`, err);
+                            }
+                        } else {
+                            console.warn(`pillar-pipeline skipping tag-or-create for video=${videoId} (essence not ready)`);
+                        }
 
-                            // 3. Series detection (regex pre-filter; LLM only fires
-                            //    on hits). Series pillars are still auto-created
-                            //    because they respond to an explicit signal in the
-                            //    transcript ("welcome to my series"), not LLM
-                            //    guessing — high precision.
+                        // 3. Series detection (regex pre-filter; LLM only fires on
+                        //    hits). Reads raw transcript text directly — does NOT
+                        //    depend on essence persistence, so it runs even when
+                        //    the essence step fails.
+                        try {
                             await detectAndPersistSeriesIfApplicable({
                                 supabase, groq, userId: user.id, videoId,
                                 transcriptText: fullTranscriptText,
                             });
-                        } catch (pillarErr) {
-                            console.error('Pillar pipeline failed (non-fatal):', pillarErr);
+                        } catch (err) {
+                            console.error(`pillar-pipeline series-detector failed video=${videoId}:`, err);
                         }
                         // Tell the client pillar tags are ready to fetch. Fired even if
                         // the pillar block threw — the upload-context listener should

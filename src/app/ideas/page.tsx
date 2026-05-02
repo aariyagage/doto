@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Bookmark, Trash2, ChevronDown, ChevronUp, Loader2, Sparkles, Check, RefreshCw, X, Star } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import AppLayout from '@/components/AppLayout'
+import AppLayout, { displayBg } from '@/components/AppLayout'
 
 interface Pillar {
     id: string;
@@ -563,20 +563,20 @@ export default function IdeasPage() {
                                             key={p.id}
                                             onClick={() => togglePillar(p.id)}
                                             style={{
-                                                backgroundColor: isSelected ? p.color : undefined,
+                                                backgroundColor: isSelected ? displayBg(p.color) : undefined,
                                                 color: isSelected ? '#111827' : undefined,
-                                                borderColor: !isSelected ? p.color : 'transparent',
+                                                borderColor: !isSelected ? displayBg(p.color) : 'transparent',
                                             }}
                                             className={`group relative flex items-center gap-2 h-10 px-4 cursor-pointer transition-transform hover:-translate-y-1 rounded-t-xl rounded-br-xl shadow-sm hover:shadow ${!isSelected ? 'bg-paper-elevated border-2 opacity-80 hover:opacity-100 text-ink-muted' : 'font-bold border border-black/10 z-10'}`}
                                         >
                                             <div
                                                 className="absolute -top-2.5 left-0 w-1/2 h-3.5 rounded-t-lg transition-colors"
                                                 style={{
-                                                    backgroundColor: isSelected ? p.color : p.color,
+                                                    backgroundColor: displayBg(p.color),
                                                     opacity: isSelected ? 1 : 0.4,
-                                                    borderTop: !isSelected ? `1px solid ${p.color}` : 'none',
-                                                    borderLeft: !isSelected ? `1px solid ${p.color}` : 'none',
-                                                    borderRight: !isSelected ? `1px solid ${p.color}` : 'none'
+                                                    borderTop: !isSelected ? `1px solid ${displayBg(p.color)}` : 'none',
+                                                    borderLeft: !isSelected ? `1px solid ${displayBg(p.color)}` : 'none',
+                                                    borderRight: !isSelected ? `1px solid ${displayBg(p.color)}` : 'none'
                                                 }}
                                             ></div>
 
@@ -658,7 +658,7 @@ export default function IdeasPage() {
                             {/* Render Ideas */}
                             {!isLoading && filteredIdeas.map(idea => {
                                 const pillar = idea.pillars || pillars.find(p => p.id === idea.pillar_id)
-                                const comboColorBg = pillar?.color || 'var(--paper-elevated)';
+                                const comboColorBg = pillar?.color ? displayBg(pillar.color) : 'var(--paper-elevated)';
                                 const isDefault = !pillar?.color;
 
                                 return (

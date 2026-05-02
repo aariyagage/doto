@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import { Trash2, Calendar, Layers } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
-import AppLayout, { getPairedTextColor } from '@/components/AppLayout'
+import AppLayout, { getPairedTextColor, displayBg } from '@/components/AppLayout'
 import { useToast } from '@/components/toast'
 import Folder from '@/components/Folder'
 import PillarSeriesDeclareModal from '@/components/PillarSeriesDeclareModal'
@@ -192,7 +192,7 @@ export default function VideoLibraryPage() {
                                                                 <span
                                                                     key={p.id}
                                                                     className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium"
-                                                                    style={{ backgroundColor: p.color, color: getPairedTextColor(p.color) }}
+                                                                    style={{ backgroundColor: displayBg(p.color), color: getPairedTextColor(p.color) }}
                                                                 >
                                                                     {p.name}
                                                                     {p.is_series && (

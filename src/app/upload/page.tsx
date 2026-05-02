@@ -4,7 +4,7 @@ import { useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { UploadCloud, CheckCircle2, AlertCircle, RefreshCw, X, Loader2, Copy } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import AppLayout, { getPairedTextColor } from '@/components/AppLayout'
+import AppLayout, { getPairedTextColor, displayBg } from '@/components/AppLayout'
 import { useUpload, type UploadStatus } from '@/components/upload-context'
 
 const activeSteps: UploadStatus[] = ['extract_audio', 'uploading', 'chunk_audio', 'transcribe', 'save_transcript', 'analyze', 'pillars_ready']
@@ -158,7 +158,7 @@ export default function UploadPage() {
                                                         {(task.pillars && task.pillars.length > 0) ? (
                                                             <div className="flex gap-1.5 ml-2">
                                                                 {task.pillars.map(p => (
-                                                                    <span key={p.id} style={{ backgroundColor: p.color, color: getPairedTextColor(p.color) }} className="text-[10px] font-medium px-2 py-0.5 rounded">
+                                                                    <span key={p.id} style={{ backgroundColor: displayBg(p.color), color: getPairedTextColor(p.color) }} className="text-[10px] font-medium px-2 py-0.5 rounded">
                                                                         {p.name}
                                                                     </span>
                                                                 ))}

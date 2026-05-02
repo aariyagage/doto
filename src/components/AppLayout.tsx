@@ -16,7 +16,7 @@ import {
 } from 'lucide-react'
 
 // Re-export for backwards compatibility with existing imports
-export { PILLAR_COLORS, getPairedTextColor } from '@/lib/colors'
+export { PILLAR_COLORS, getPairedTextColor, displayBg } from '@/lib/colors'
 
 const NAV_ITEMS = [
     { label: 'dashboard', path: '/dashboard', Icon: LayoutGrid },

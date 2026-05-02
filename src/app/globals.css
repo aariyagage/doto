@@ -26,10 +26,11 @@
     /* Accent — manila ink (used sparingly) */
     --accent: #3D2C1E;
 
-    /* Decorative manila for folder UI */
-    --manila: #C8B58A;
-    --manila-deep: #A89464;
-    --manila-ink: #3D2C1E;
+    /* Decorative manila for folder UI — points at dessert cup so the landing
+     * accent and folder UI share the brand palette. */
+    --manila: #B49C84;
+    --manila-deep: #8C7960;
+    --manila-ink: #481F1F;
 
     /* Type scale — sizes only; tracking + family applied via classes below */
     --display-1: 5rem;     /* 80px — hero */
@@ -53,25 +54,29 @@
     --skeleton: var(--paper-sunken);
     --text-primary: var(--ink);
 
-    /* Pillar Color Combos — kept intact (DB-bound; users have saved colors) */
-    --combo-1-bg: #630700;
-    --combo-1-text: #FF97D0;
-    --combo-2-bg: #FF97D0;
-    --combo-2-text: #125603;
-    --combo-3-bg: #125603;
-    --combo-3-text: #FF97D0;
-    --combo-4-bg: #C3F380;
-    --combo-4-text: #7523B4;
-    --combo-5-bg: #7523B4;
-    --combo-5-text: #FAE170;
-    --combo-6-bg: #D13F13;
-    --combo-6-text: #FCC5C6;
-    --combo-7-bg: #F058AB;
-    --combo-7-text: #F1FFBA;
-    --combo-8-bg: #906713;
-    --combo-8-text: #FFDB58;
-    --combo-9-bg: #0D5072;
-    --combo-9-text: #7FEEFF;
+    /* Pillar Color Combos — earthy palette.
+     *   1 dessert cup, 2 rose petals, 3 shop window (sage), 4 cowboy boots.
+     * combo-3 stays sage so upload/password "active/success" UI reads green-ish.
+     * combo-6 stays terracotta so toasts/delete UI reads warm-destructive.
+     * combo-5..9 alias back to 1..4 to cover legacy references. */
+    --combo-1-bg: #B49C84;  /* dessert cup */
+    --combo-1-text: #FAF8F3;
+    --combo-2-bg: #D97066;  /* rose petals */
+    --combo-2-text: #FAF8F3;
+    --combo-3-bg: #CBD0AF;  /* shop window — sage */
+    --combo-3-text: #1A1816;
+    --combo-4-bg: #481F1F;  /* cowboy boots */
+    --combo-4-text: #FAF8F3;
+    --combo-5-bg: var(--combo-1-bg);
+    --combo-5-text: var(--combo-1-text);
+    --combo-6-bg: var(--combo-2-bg);
+    --combo-6-text: var(--combo-2-text);
+    --combo-7-bg: var(--combo-3-bg);
+    --combo-7-text: var(--combo-3-text);
+    --combo-8-bg: var(--combo-4-bg);
+    --combo-8-text: var(--combo-4-text);
+    --combo-9-bg: var(--combo-1-bg);
+    --combo-9-text: var(--combo-1-text);
 
     /* shadcn/ui variables — repointed onto the editorial palette */
     --background: 36 33% 96%;        /* paper */

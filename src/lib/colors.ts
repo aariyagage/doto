@@ -1,13 +1,8 @@
 export const PILLAR_COLORS = [
-    { bg: '#630700', text: '#FF97D0' }, // 1: Blood Red
-    { bg: '#FF97D0', text: '#125603' }, // 2: Pastel Magenta
-    { bg: '#125603', text: '#FF97D0' }, // 3: Lincoln Green
-    { bg: '#C3F380', text: '#7523B4' }, // 4: Light Lime
-    { bg: '#7523B4', text: '#FAE170' }, // 5: Grape
-    { bg: '#D13F13', text: '#FCC5C6' }, // 6: Sinopia
-    { bg: '#F058AB', text: '#F1FFBA' }, // 7: Baby Pink
-    { bg: '#906713', text: '#FFDB58' }, // 8: Golden Brown
-    { bg: '#0D5072', text: '#7FEEFF' }, // 9: Dark Cerulean
+    { bg: '#B49C84', text: '#FAF8F3' }, // 1: dessert cup
+    { bg: '#D97066', text: '#FAF8F3' }, // 2: rose petals
+    { bg: '#CBD0AF', text: '#1A1816' }, // 3: shop window (sage)
+    { bg: '#481F1F', text: '#FAF8F3' }, // 4: cowboy boots
 ] as const
 
 export function getCombo(index: number) {

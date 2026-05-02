@@ -5,13 +5,14 @@ import Folder from '@/components/Folder'
 
 const EASE = [0.25, 1, 0.5, 1] as const
 
-const WORKSPACE_FOLDERS: { label: string; caption: string; index: string }[] = [
-    { label: 'Videos',      caption: 'raw material',         index: '01' },
-    { label: 'Transcripts', caption: 'what you said',        index: '02' },
-    { label: 'Pillars',     caption: 'recurring themes',     index: '03' },
-    { label: 'Ideas',       caption: 'next, automatically',  index: '04' },
-    { label: 'Voice',       caption: 'your signature DNA',   index: '05' },
-    { label: 'Library',     caption: 'everything, sorted',   index: '06' },
+// Cycle through the 4-color palette so the landing showcases the combos.
+const WORKSPACE_FOLDERS: { label: string; caption: string; index: string; color: string }[] = [
+    { label: 'Videos',      caption: 'raw material',         index: '01', color: '#B49C84' }, // dessert cup
+    { label: 'Transcripts', caption: 'what you said',        index: '02', color: '#D97066' }, // rose petals
+    { label: 'Pillars',     caption: 'recurring themes',     index: '03', color: '#CBD0AF' }, // shop window
+    { label: 'Ideas',       caption: 'next, automatically',  index: '04', color: '#481F1F' }, // cowboy boots
+    { label: 'Voice',       caption: 'your signature DNA',   index: '05', color: '#B49C84' }, // dessert cup
+    { label: 'Library',     caption: 'everything, sorted',   index: '06', color: '#D97066' }, // rose petals
 ]
 
 export default function WorkspaceShelf() {
@@ -46,6 +47,7 @@ export default function WorkspaceShelf() {
                             label={f.label}
                             caption={f.caption}
                             index={f.index}
+                            color={f.color}
                             size="md"
                         />
                     </motion.div>

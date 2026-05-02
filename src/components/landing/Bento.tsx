@@ -5,12 +5,12 @@ import BentoTile from './BentoTile'
 
 const EASE = [0.25, 1, 0.5, 1] as const
 
-const PILLAR_CHIPS = [
-    'Productivity',
-    'Mindset',
-    'Founder Diaries',
-    'Solopreneur Saturdays',
-    'Voice',
+const PILLAR_CHIPS: { label: string; bg: string; text: string }[] = [
+    { label: 'Productivity',           bg: '#B49C84', text: '#FFFFFF' }, // dessert cup
+    { label: 'Mindset',                bg: '#D97066', text: '#FFFFFF' }, // rose petals
+    { label: 'Founder Diaries',        bg: '#CBD0AF', text: '#1A1816' }, // shop window
+    { label: 'Solopreneur Saturdays',  bg: '#481F1F', text: '#FFFFFF' }, // cowboy boots
+    { label: 'Voice',                  bg: '#B49C84', text: '#FFFFFF' }, // dessert cup
 ]
 
 const IDEA_CARDS = [
@@ -33,6 +33,12 @@ function TranscriptReveal() {
         { text: "that's broken", highlight: 'mindset' },
         { text: '— and' }, { text: 'what' }, { text: 'works' }, { text: 'instead.' },
     ]
+
+    // Per-pillar highlight tints, drawn from the active palette.
+    const HIGHLIGHT_BG = {
+        productivity: 'rgba(180, 156, 132, 0.45)', // dessert cup
+        mindset:      'rgba(217, 112, 102, 0.32)', // rose petals
+    } as const
 
     return (
         <div className="flex-1 flex flex-col justify-end">
@@ -58,7 +64,7 @@ function TranscriptReveal() {
                         }
                         style={
                             tok.highlight
-                                ? { backgroundColor: 'rgba(200, 181, 138, 0.32)' }
+                                ? { backgroundColor: HIGHLIGHT_BG[tok.highlight] }
                                 : undefined
                         }
                     >
@@ -67,7 +73,7 @@ function TranscriptReveal() {
                 ))}
             </motion.p>
 
-            {/* Pillar tags inferred from the highlighted phrases */}
+            {/* Pillar tags inferred from the highlighted phrases — match palette */}
             <motion.div
                 initial={{ opacity: 0, y: 8 }}
                 whileInView={{ opacity: 1, y: 0 }}
@@ -76,14 +82,15 @@ function TranscriptReveal() {
                 className="mt-6 flex flex-wrap gap-2"
             >
                 {[
-                    { label: 'Productivity', n: '01' },
-                    { label: 'Mindset', n: '02' },
+                    { label: 'productivity', n: '01', bg: '#B49C84', text: '#FFFFFF' },
+                    { label: 'mindset',      n: '02', bg: '#D97066', text: '#FFFFFF' },
                 ].map(p => (
                     <span
                         key={p.label}
-                        className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-paper border border-rule text-body-sm text-ink"
+                        className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-body-sm font-medium"
+                        style={{ backgroundColor: p.bg, color: p.text }}
                     >
-                        <span className="text-ink-faint tabular-nums font-light">
+                        <span className="tabular-nums font-light opacity-70">
                             {p.n}
                         </span>
                         {p.label}
@@ -106,15 +113,16 @@ function PillarChips() {
         >
             {PILLAR_CHIPS.map(p => (
                 <motion.span
-                    key={p}
+                    key={p.label}
                     variants={{
                         hidden: { opacity: 0, y: 8 },
                         visible: { opacity: 1, y: 0 },
                     }}
                     transition={{ duration: 0.4, ease: EASE }}
-                    className="inline-flex items-center px-3 py-1.5 rounded-full bg-paper border border-rule text-body-sm text-ink"
+                    className="inline-flex items-center px-3 py-1.5 rounded-full text-body-sm font-medium"
+                    style={{ backgroundColor: p.bg, color: p.text }}
                 >
-                    {p}
+                    {p.label}
                 </motion.span>
             ))}
         </motion.div>

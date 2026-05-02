@@ -165,7 +165,7 @@ export default function VideoLibraryPage() {
                             )}
 
                             {!isLoading && transcripts.map(transcript => {
-                                const mainColor = transcript.attachedPillars?.[0]?.color || '#9ca3af';
+                                const mainColor = displayBg(transcript.attachedPillars?.[0]?.color || '#9ca3af');
 
                                 return (
                                     <div key={transcript.id} className="relative flex flex-col rounded-2xl border border-rule bg-paper-elevated shadow-sm hover:shadow-md hover:border-ink/15 transition-all">

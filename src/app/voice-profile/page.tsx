@@ -2,9 +2,9 @@
 
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { Feather, Loader2, Quote, Hash, MessagesSquare, CheckCircle2, Fingerprint, Video } from 'lucide-react'
+import { Loader2, CheckCircle2 } from 'lucide-react'
 import Link from 'next/link'
-import AppLayout from '@/components/AppLayout'
+import AppLayout, { PILLAR_COLORS } from '@/components/AppLayout'
 
 interface VoiceProfile {
     niche_summary?: string;
@@ -14,10 +14,20 @@ interface VoiceProfile {
     updated_at: string;
 }
 
+type TabKey = 'voice' | 'tone' | 'archetype' | 'phrases'
+
+const TABS: { key: TabKey; label: string }[] = [
+    { key: 'voice',     label: 'voice' },
+    { key: 'tone',      label: 'tone' },
+    { key: 'archetype', label: 'archetype' },
+    { key: 'phrases',   label: 'phrases' },
+]
+
 export default function VoiceProfilePage() {
     const supabase = createClient()
     const [profile, setProfile] = useState<VoiceProfile | null>(null)
     const [isLoading, setIsLoading] = useState(true)
+    const [active, setActive] = useState<TabKey>('voice')
 
     useEffect(() => {
         const loadProfile = async () => {
@@ -43,150 +53,149 @@ export default function VoiceProfilePage() {
         loadProfile()
     }, [supabase])
 
+    const lastUpdated = profile?.updated_at
+        ? new Date(profile.updated_at)
+        : null
+
+    const lastUpdatedLabel = lastUpdated && !isNaN(lastUpdated.getTime())
+        ? lastUpdated.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+        : null
+
     return (
         <AppLayout>
-            {/* Main Content Area */}
-            <div className="flex-1 flex flex-col overflow-hidden w-full relative">
-                <main className="flex-1 w-full">
-                    <div className="w-full max-w-5xl mx-auto space-y-8">
-                        {/* Top Bar */}
-                        <div className="flex items-center justify-between mb-8">
-                            <div>
-                                <h1 className="text-title-1 text-ink">
-                                    voice profile
-                                </h1>
-                                <p className="text-body-sm text-ink-muted mt-2">your unique creator DNA, continuously trained by AI.</p>
-                            </div>
+            <div className="w-full max-w-5xl mx-auto">
+                {/* Header */}
+                <div className="mb-10">
+                    <h1 className="text-title-1 text-ink">voice profile</h1>
+                    <p className="text-body-sm text-ink-muted mt-2">
+                        your unique creator dna · trained by ai
+                    </p>
+                </div>
+
+                {isLoading ? (
+                    <div className="flex flex-col items-center justify-center py-24 text-center">
+                        <Loader2 className="h-8 w-8 animate-spin text-ink-faint" />
+                        <p className="text-body-sm text-ink-muted mt-4">loading profile...</p>
+                    </div>
+                ) : !profile ? (
+                    <div className="rounded-3xl border border-rule bg-paper-elevated p-16 text-center">
+                        <h3 className="text-title-3 text-ink mb-2">no voice profile yet</h3>
+                        <p className="text-body-sm text-ink-muted max-w-md mx-auto mb-6">
+                            upload a video to train your creator dna. the ai will analyze your speech and build the profile from there.
+                        </p>
+                        <Link
+                            href="/upload"
+                            className="inline-flex items-center gap-2 rounded-full bg-ink text-paper px-5 py-2.5 text-body-sm font-medium hover:bg-ink/90 transition-colors"
+                        >
+                            upload video
+                        </Link>
+                    </div>
+                ) : (
+                    <div>
+                        {/* Tabs — folder-style */}
+                        <div className="flex items-end pl-4 gap-1 relative">
+                            {TABS.map(t => {
+                                const isActive = active === t.key
+                                return (
+                                    <button
+                                        key={t.key}
+                                        onClick={() => setActive(t.key)}
+                                        className={`relative px-5 py-2.5 text-body-sm font-medium transition-all border border-rule rounded-t-xl ${
+                                            isActive
+                                                ? 'bg-paper-elevated text-ink z-10 border-b-paper-elevated'
+                                                : 'bg-paper-sunken text-ink-muted hover:text-ink translate-y-[3px]'
+                                        }`}
+                                    >
+                                        {t.label}
+                                    </button>
+                                )
+                            })}
                         </div>
 
-                        {/* Content Area */}
-                        {isLoading ? (
-                            <div className="flex flex-col items-center justify-center py-24 text-center">
-                                <Loader2 className="h-8 w-8 animate-spin text-ink-faint" />
-                                <p className="text-body-sm text-ink-muted mt-4">loading profile...</p>
-                            </div>
-                        ) : !profile ? (
-                            <div className="flex flex-col items-center justify-center py-24 text-center border-2 border-dashed border-rule rounded-3xl bg-paper-elevated">
-                                <div
-                                    className="shadow-sm p-4 rounded-full mb-4"
-                                    style={{ backgroundColor: 'var(--combo-5-bg)', color: 'var(--combo-5-text)' }}
-                                >
-                                    <Fingerprint className="h-10 w-10" />
+                        {/* Panel */}
+                        <div className="bg-paper-elevated border border-rule rounded-2xl rounded-tl-none p-8 md:p-12 min-h-[420px] -mt-px relative z-0">
+                            {active === 'voice' && (
+                                <div>
+                                    <span className="text-caption text-ink-faint">
+                                        trained by ai{lastUpdatedLabel ? ` · last updated ${lastUpdatedLabel}` : ''}
+                                    </span>
+                                    <p className="text-display-3 text-ink mt-6 leading-snug text-balance">
+                                        {profile.niche_summary || 'generating niche summary…'}
+                                    </p>
                                 </div>
-                                <h3 className="text-title-3 text-ink mb-2">no voice profile found</h3>
-                                <p className="text-body-sm text-ink-muted mb-6 max-w-sm mx-auto leading-relaxed">
-                                    upload a video to train your personalized creator DNA. the AI will analyze your speech and generate your profile.
-                                </p>
-                                <Link href="/upload">
-                                    <button className="bg-ink text-paper hover:bg-ink/90 transition-colors font-medium rounded-full px-5 py-2.5 text-sm inline-flex items-center gap-2">
-                                        <Video className="h-4 w-4" /> upload video
-                                    </button>
-                                </Link>
-                            </div>
-                        ) : (
-                            <div className="space-y-6 lg:space-y-8">
-                                {/* Top Banner summary — Grape accent */}
-                                <div className="bg-paper-elevated border border-rule border-l-[3px] border-l-[var(--combo-5-bg)] rounded-2xl p-6 md:p-8 relative overflow-hidden">
-                                    <div className="absolute top-0 right-0 p-8 opacity-[0.05] dark:opacity-15 pointer-events-none">
-                                        <Fingerprint className="h-32 w-32 text-[var(--combo-5-bg)] transform rotate-12" />
-                                    </div>
-                                    <div className="relative z-10 max-w-3xl">
-                                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[var(--combo-5-bg)] text-[var(--combo-5-text)] text-xs font-medium mb-4">
-                                            <Feather className="h-3.5 w-3.5" /> trained by AI
-                                        </span>
-                                        <h2 className="text-xl md:text-3xl font-semibold tracking-tight text-ink leading-tight mb-4">
-                                            {profile.niche_summary || "generating niche summary..."}
-                                        </h2>
-                                        <p className="text-xs font-medium text-ink-faint">
-                                            last updated {new Date(profile.updated_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                            )}
+
+                            {active === 'tone' && (
+                                <div>
+                                    <span className="text-caption text-ink-faint">a few words on how you sound</span>
+                                    {profile.tone_descriptors && profile.tone_descriptors.length > 0 ? (
+                                        <div className="mt-8 flex flex-wrap gap-2">
+                                            {profile.tone_descriptors.map((tone, i) => {
+                                                const slot = PILLAR_COLORS[i % PILLAR_COLORS.length]
+                                                return (
+                                                    <span
+                                                        key={i}
+                                                        className="px-3.5 py-1.5 rounded-full text-body-sm font-medium"
+                                                        style={{ backgroundColor: slot.bg, color: slot.text }}
+                                                    >
+                                                        {tone}
+                                                    </span>
+                                                )
+                                            })}
+                                        </div>
+                                    ) : (
+                                        <p className="mt-6 text-body-sm text-ink-faint">
+                                            no tone descriptors yet — analyze a few more videos.
                                         </p>
-                                    </div>
+                                    )}
                                 </div>
+                            )}
 
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                    {/* Tone Descriptors */}
-                                    <div className="bg-paper-elevated border border-rule rounded-2xl p-6 flex flex-col">
-                                        <div className="flex items-center gap-3 mb-6 pb-4 border-b border-rule">
-                                            <div
-                                                className="h-9 w-9 rounded-full flex items-center justify-center"
-                                                style={{ backgroundColor: 'var(--combo-6-bg)', color: 'var(--combo-6-text)' }}
-                                            >
-                                                <Hash className="h-4 w-4" />
-                                            </div>
-                                            <h3 className="text-title-3 text-ink">your unique tone</h3>
-                                        </div>
-                                        <div className="flex flex-wrap gap-2 mt-auto">
-                                            {(profile.tone_descriptors || []).map((tone: string, i: number) => (
-                                                <span
-                                                    key={i}
-                                                    className="px-2.5 py-1 rounded-lg text-xs font-medium transition-colors"
-                                                    style={{
-                                                        backgroundColor: `color-mix(in srgb, var(--combo-${(i % 9) + 1}-bg) 12%, transparent)`,
-                                                        color: 'var(--ink)',
-                                                        border: '1px solid color-mix(in srgb, var(--combo-' + ((i % 9) + 1) + '-bg) 25%, transparent)',
-                                                    }}
-                                                >
-                                                    {tone}
-                                                </span>
-                                            ))}
-                                            {(!profile.tone_descriptors || profile.tone_descriptors.length === 0) && (
-                                                <span className="text-ink-faint text-sm">no tone descriptors detected yet.</span>
-                                            )}
-                                        </div>
-                                    </div>
-
-                                    {/* Content Style */}
-                                    <div className="bg-paper-elevated border border-rule rounded-2xl p-6 flex flex-col">
-                                        <div className="flex items-center gap-3 mb-6 pb-4 border-b border-rule">
-                                            <div
-                                                className="h-9 w-9 rounded-full flex items-center justify-center"
-                                                style={{ backgroundColor: 'var(--combo-3-bg)', color: 'var(--combo-3-text)' }}
-                                            >
-                                                <MessagesSquare className="h-4 w-4" />
-                                            </div>
-                                            <h3 className="text-title-3 text-ink">content archetype</h3>
-                                        </div>
-                                        <div className="mt-auto">
-                                            <div
-                                                className="inline-flex items-center gap-2.5 px-4 py-2.5 rounded-xl font-semibold capitalize text-sm"
-                                                style={{ backgroundColor: 'var(--combo-3-bg)', color: 'var(--combo-3-text)' }}
+                            {active === 'archetype' && (
+                                <div>
+                                    <span className="text-caption text-ink-faint">your style</span>
+                                    {profile.content_style ? (
+                                        <div className="mt-8">
+                                            <span
+                                                className="inline-flex items-center gap-2 px-4 py-2 rounded-full text-body font-medium"
+                                                style={{ backgroundColor: PILLAR_COLORS[2].bg, color: PILLAR_COLORS[2].text }}
                                             >
                                                 <CheckCircle2 className="h-4 w-4" />
-                                                {profile.content_style || "Analyzing..."}
-                                            </div>
+                                                {profile.content_style}
+                                            </span>
                                         </div>
-                                    </div>
-
-                                    {/* Recurring Phrases */}
-                                    <div className="bg-paper-elevated border border-rule rounded-2xl p-6 md:p-8 md:col-span-2">
-                                        <div className="flex items-center gap-3 mb-6 pb-4 border-b border-rule">
-                                            <div
-                                                className="h-9 w-9 rounded-full flex items-center justify-center"
-                                                style={{ backgroundColor: 'var(--combo-9-bg)', color: 'var(--combo-9-text)' }}
-                                            >
-                                                <Quote className="h-4 w-4" />
-                                            </div>
-                                            <h3 className="text-title-3 text-ink">signature phrases</h3>
-                                        </div>
-                                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-                                            {(profile.recurring_phrases || []).map((phrase: string, i: number) => (
-                                                <div key={i} className="flex gap-3 items-start p-4 bg-ink/[0.03] rounded-xl border border-rule hover:bg-ink/[0.05] transition-colors">
-                                                    <span className="text-[var(--combo-5-bg)] text-3xl leading-none mt-0 opacity-60">&ldquo;</span>
-                                                    <p className="text-sm text-ink-muted flex-1 leading-relaxed mt-1">
-                                                        {phrase}
-                                                    </p>
-                                                </div>
-                                            ))}
-                                            {(!profile.recurring_phrases || profile.recurring_phrases.length === 0) && (
-                                                <span className="text-ink-faint text-sm">need to analyze more videos&hellip;</span>
-                                            )}
-                                        </div>
-                                    </div>
+                                    ) : (
+                                        <p className="mt-6 text-body-sm text-ink-faint">analyzing…</p>
+                                    )}
                                 </div>
-                            </div>
-                        )}
+                            )}
+
+                            {active === 'phrases' && (
+                                <div>
+                                    <span className="text-caption text-ink-faint">the things you say a lot</span>
+                                    {profile.recurring_phrases && profile.recurring_phrases.length > 0 ? (
+                                        <ol className="mt-8 space-y-6 max-w-3xl">
+                                            {profile.recurring_phrases.map((phrase, i) => (
+                                                <li key={i} className="flex gap-5">
+                                                    <span className="text-caption text-ink-faint tabular-nums pt-2 shrink-0">
+                                                        {String(i + 1).padStart(2, '0')}
+                                                    </span>
+                                                    <p className="text-body-lg text-ink italic leading-snug">
+                                                        &ldquo;{phrase}&rdquo;
+                                                    </p>
+                                                </li>
+                                            ))}
+                                        </ol>
+                                    ) : (
+                                        <p className="mt-6 text-body-sm text-ink-faint">
+                                            need to analyze more videos to surface recurring phrases.
+                                        </p>
+                                    )}
+                                </div>
+                            )}
+                        </div>
                     </div>
-                </main>
+                )}
             </div>
         </AppLayout>
     )

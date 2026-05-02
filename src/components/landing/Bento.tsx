@@ -7,7 +7,7 @@ const EASE = [0.25, 1, 0.5, 1] as const
 
 const PILLAR_CHIPS: { label: string; bg: string; text: string }[] = [
     { label: 'Productivity',           bg: '#B49C84', text: '#FFFFFF' }, // dessert cup
-    { label: 'Mindset',                bg: '#D97066', text: '#FFFFFF' }, // rose petals
+    { label: 'Mindset',                bg: '#D97066', text: '#1A1816' }, // rose petals
     { label: 'Founder Diaries',        bg: '#CBD0AF', text: '#1A1816' }, // shop window
     { label: 'Solopreneur Saturdays',  bg: '#481F1F', text: '#FFFFFF' }, // cowboy boots
     { label: 'Voice',                  bg: '#B49C84', text: '#FFFFFF' }, // dessert cup
@@ -83,7 +83,7 @@ function TranscriptReveal() {
             >
                 {[
                     { label: 'productivity', n: '01', bg: '#B49C84', text: '#FFFFFF' },
-                    { label: 'mindset',      n: '02', bg: '#D97066', text: '#FFFFFF' },
+                    { label: 'mindset',      n: '02', bg: '#D97066', text: '#1A1816' },
                 ].map(p => (
                     <span
                         key={p.label}

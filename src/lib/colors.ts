@@ -1,6 +1,6 @@
 export const PILLAR_COLORS = [
     { bg: '#B49C84', text: '#FAF8F3' }, // 1: dessert cup
-    { bg: '#D97066', text: '#FAF8F3' }, // 2: rose petals
+    { bg: '#D97066', text: '#1A1816' }, // 2: rose petals
     { bg: '#CBD0AF', text: '#1A1816' }, // 3: shop window (sage)
     { bg: '#481F1F', text: '#FFFFFF' }, // 4: cowboy boots
 ] as const

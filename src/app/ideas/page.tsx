@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Bookmark, Trash2, ChevronDown, ChevronUp, Loader2, Sparkles, Check, RefreshCw, X, Star } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import AppLayout, { displayBg } from '@/components/AppLayout'
+import AppLayout, { displayBg, getPairedTextColor } from '@/components/AppLayout'
 
 interface Pillar {
     id: string;
@@ -564,7 +564,7 @@ export default function IdeasPage() {
                                             onClick={() => togglePillar(p.id)}
                                             style={{
                                                 backgroundColor: isSelected ? displayBg(p.color) : undefined,
-                                                color: isSelected ? '#111827' : undefined,
+                                                color: isSelected ? getPairedTextColor(p.color) : undefined,
                                                 borderColor: !isSelected ? displayBg(p.color) : 'transparent',
                                             }}
                                             className={`group relative flex items-center gap-2 h-10 px-4 cursor-pointer transition-transform hover:-translate-y-1 rounded-t-xl rounded-br-xl shadow-sm hover:shadow ${!isSelected ? 'bg-paper-elevated border-2 opacity-80 hover:opacity-100 text-ink-muted' : 'font-bold border border-black/10 z-10'}`}
@@ -660,16 +660,22 @@ export default function IdeasPage() {
                                 const pillar = idea.pillars || pillars.find(p => p.id === idea.pillar_id)
                                 const comboColorBg = pillar?.color ? displayBg(pillar.color) : 'var(--paper-elevated)';
                                 const isDefault = !pillar?.color;
+                                // Paired ink for non-default cards. Adapts to the bg's luminance so
+                                // cowboy-boots / dark pillars still read.
+                                const cardInk = !isDefault && pillar?.color ? getPairedTextColor(pillar.color) : ''
+                                const inkMuted = cardInk ? `color-mix(in srgb, ${cardInk} 75%, transparent)` : ''
+                                const inkFaint = cardInk ? `color-mix(in srgb, ${cardInk} 55%, transparent)` : ''
+                                const inkSubtle = cardInk ? `color-mix(in srgb, ${cardInk} 25%, transparent)` : ''
 
                                 return (
                                     <div
                                         key={idea.id}
                                         className={`relative flex flex-col rounded-3xl border ${isDefault ? 'border-rule bg-paper-elevated' : 'border-transparent'} p-6 shadow-sm transition-opacity duration-300 ${idea.is_used ? 'opacity-50' : 'opacity-100'} overflow-hidden`}
-                                        style={{ backgroundColor: isDefault ? undefined : comboColorBg }}
+                                        style={{ backgroundColor: isDefault ? undefined : comboColorBg, color: isDefault ? undefined : cardInk }}
                                     >
                                         {!isDefault && (
                                             <div className="absolute right-0 top-0 bottom-0 w-32 pointer-events-none z-0">
-                                                <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="w-full h-full text-paper fill-current opacity-20 dark:opacity-5">
+                                                <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="w-full h-full fill-current opacity-10">
                                                     <path d="M100,0 L0,50 L100,100 Z" />
                                                 </svg>
                                             </div>
@@ -685,36 +691,53 @@ export default function IdeasPage() {
                                             {/* Card Top Row - Pillar Badge Only */}
                                             <div className="mb-3 flex items-center justify-between">
                                                 <span
-                                                    className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-medium ${isDefault ? 'bg-ink/[0.06] text-ink-muted' : 'bg-black/10 text-gray-900'}`}
+                                                    className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-medium ${isDefault ? 'bg-ink/[0.06] text-ink-muted' : ''}`}
+                                                    style={isDefault ? undefined : { backgroundColor: inkSubtle, color: cardInk }}
                                                 >
                                                     {pillar?.name || 'uncategorized'}
                                                 </span>
                                                 <button
                                                     onClick={() => toggleSave(idea.id, idea.is_saved)}
-                                                    className={`transition-colors hover:scale-110 ${idea.is_saved ? (isDefault ? 'text-blue-500' : 'text-gray-900') : (isDefault ? 'text-ink-faint hover:text-ink-muted' : 'text-black/30 hover:text-black/60')}`}
+                                                    className={`transition-colors hover:scale-110 ${isDefault ? (idea.is_saved ? 'text-blue-500' : 'text-ink-faint hover:text-ink-muted') : ''}`}
+                                                    style={isDefault ? undefined : { color: idea.is_saved ? cardInk : inkFaint }}
                                                 >
                                                     <Star className={`h-5 w-5 ${idea.is_saved ? 'fill-current' : ''}`} strokeWidth={idea.is_saved ? 2 : 1.5} />
                                                 </button>
                                             </div>
 
                                             {/* Title */}
-                                            <h2 className={`text-xl md:text-2xl font-semibold tracking-tight leading-tight mb-5 ${isDefault ? 'text-ink' : 'text-gray-900'}`}>
+                                            <h2
+                                                className={`text-xl md:text-2xl font-semibold tracking-tight leading-tight mb-5 ${isDefault ? 'text-ink' : ''}`}
+                                                style={isDefault ? undefined : { color: cardInk }}
+                                            >
                                                 {idea.title}
                                             </h2>
 
                                             {/* Hook Section */}
                                             <div className="mb-5">
-                                                <span className={`text-[11px] font-semibold block mb-1.5 ${isDefault ? 'text-ink-faint' : 'text-black/50'}`}>hook</span>
-                                                <p className={`text-base md:text-lg font-medium ${isDefault ? 'text-ink' : 'text-gray-900'}`}>
+                                                <span
+                                                    className={`text-[11px] font-semibold block mb-1.5 ${isDefault ? 'text-ink-faint' : ''}`}
+                                                    style={isDefault ? undefined : { color: inkFaint }}
+                                                >
+                                                    hook
+                                                </span>
+                                                <p
+                                                    className={`text-base md:text-lg font-medium ${isDefault ? 'text-ink' : ''}`}
+                                                    style={isDefault ? undefined : { color: cardInk }}
+                                                >
                                                     &ldquo;{idea.hook}&rdquo;
                                                 </p>
                                             </div>
 
                                             {/* Expandable Structure */}
-                                            <div className={`mb-6 pt-4 border-t ${isDefault ? 'border-rule-soft' : 'border-black/10'}`}>
+                                            <div
+                                                className={`mb-6 pt-4 border-t ${isDefault ? 'border-rule-soft' : ''}`}
+                                                style={isDefault ? undefined : { borderColor: inkSubtle }}
+                                            >
                                                 <button
                                                     onClick={() => setIdeas(prev => prev.map(i => i.id === idea.id ? { ...i, isExpanded: !idea.isExpanded } : i))}
-                                                    className={`flex items-center text-xs font-medium transition-colors ${isDefault ? 'text-ink-muted hover:text-ink' : 'text-black/70 hover:text-black'}`}
+                                                    className={`flex items-center text-xs font-medium transition-colors ${isDefault ? 'text-ink-muted hover:text-ink' : ''}`}
+                                                    style={isDefault ? undefined : { color: inkMuted }}
                                                 >
                                                     {idea.isExpanded ? (
                                                         <><ChevronUp className="mr-1 h-3.5 w-3.5" /> less</>
@@ -724,32 +747,57 @@ export default function IdeasPage() {
                                                 </button>
 
                                                 {idea.isExpanded && (
-                                                    <div className={`mt-5 space-y-5 rounded-2xl p-5 md:p-6 animate-in slide-in-from-top-2 fade-in duration-200 ${isDefault ? 'bg-paper-sunken' : 'bg-black/5'}`}>
+                                                    <div
+                                                        className={`mt-5 space-y-5 rounded-2xl p-5 md:p-6 animate-in slide-in-from-top-2 fade-in duration-200 ${isDefault ? 'bg-paper-sunken' : ''}`}
+                                                        style={isDefault ? undefined : { backgroundColor: inkSubtle }}
+                                                    >
                                                         <div>
-                                                            <span className={`text-[11px] font-semibold block mb-2 ${isDefault ? 'text-ink-faint' : 'text-black/40'}`}>structure</span>
-                                                            <p className={`text-sm leading-relaxed whitespace-pre-wrap ${isDefault ? 'text-ink-muted' : 'text-gray-900'}`}>
+                                                            <span
+                                                                className={`text-[11px] font-semibold block mb-2 ${isDefault ? 'text-ink-faint' : ''}`}
+                                                                style={isDefault ? undefined : { color: inkFaint }}
+                                                            >
+                                                                structure
+                                                            </span>
+                                                            <p
+                                                                className={`text-sm leading-relaxed whitespace-pre-wrap ${isDefault ? 'text-ink-muted' : ''}`}
+                                                                style={isDefault ? undefined : { color: cardInk }}
+                                                            >
                                                                 {idea.structure.split('→').map((step, idx, arr) => (
                                                                     <span key={idx}>
                                                                         {step.trim()}
-                                                                        {idx < arr.length - 1 && <span className={`mx-2 ${isDefault ? 'text-ink-faint' : 'text-black/20'}`}>→</span>}
+                                                                        {idx < arr.length - 1 && <span className={isDefault ? 'mx-2 text-ink-faint' : 'mx-2'} style={isDefault ? undefined : { color: inkFaint }}>→</span>}
                                                                     </span>
                                                                 ))}
                                                             </p>
                                                         </div>
                                                         <div>
-                                                            <span className={`text-[11px] font-semibold block mb-2 ${isDefault ? 'text-ink-faint' : 'text-black/40'}`}>concept</span>
-                                                            <p className={`text-sm leading-relaxed ${isDefault ? 'text-ink-muted' : 'text-gray-900'}`}>{idea.reasoning}</p>
+                                                            <span
+                                                                className={`text-[11px] font-semibold block mb-2 ${isDefault ? 'text-ink-faint' : ''}`}
+                                                                style={isDefault ? undefined : { color: inkFaint }}
+                                                            >
+                                                                concept
+                                                            </span>
+                                                            <p
+                                                                className={`text-sm leading-relaxed ${isDefault ? 'text-ink-muted' : ''}`}
+                                                                style={isDefault ? undefined : { color: cardInk }}
+                                                            >
+                                                                {idea.reasoning}
+                                                            </p>
                                                         </div>
                                                     </div>
                                                 )}
                                             </div>
 
                                             {/* Card Bottom Row */}
-                                            <div className={`flex items-center justify-between mt-auto pt-4 border-t ${isDefault ? 'border-rule-soft' : 'border-black/10'}`}>
+                                            <div
+                                                className={`flex items-center justify-between mt-auto pt-4 border-t ${isDefault ? 'border-rule-soft' : ''}`}
+                                                style={isDefault ? undefined : { borderColor: inkSubtle }}
+                                            >
                                                 <div className="flex items-center gap-4">
                                                     <button
                                                         onClick={() => regenerateIdea(idea.id, idea.pillar_id)}
-                                                        className={`text-xs font-medium transition-colors flex items-center ${isDefault ? 'text-ink-muted hover:text-ink' : 'text-black/50 hover:text-black'}`}
+                                                        className={`text-xs font-medium transition-colors flex items-center ${isDefault ? 'text-ink-muted hover:text-ink' : ''}`}
+                                                        style={isDefault ? undefined : { color: inkMuted }}
                                                     >
                                                         ↺ regenerate
                                                     </button>
@@ -759,7 +807,8 @@ export default function IdeasPage() {
                                                     <button
                                                         onClick={() => markAsUsed(idea.id)}
                                                         disabled={idea.is_used}
-                                                        className={`flex items-center px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${idea.is_used ? (isDefault ? 'bg-green-50 text-green-600 dark:bg-green-500/10 dark:text-green-400' : 'bg-black/10 text-gray-900') : (isDefault ? 'bg-ink/[0.06] text-ink-muted hover:bg-ink/[0.1]' : 'bg-black/5 text-black/70 hover:bg-black/10')}`}
+                                                        className={`flex items-center px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${isDefault ? (idea.is_used ? 'bg-green-50 text-green-600 dark:bg-green-500/10 dark:text-green-400' : 'bg-ink/[0.06] text-ink-muted hover:bg-ink/[0.1]') : ''}`}
+                                                        style={isDefault ? undefined : { backgroundColor: inkSubtle, color: cardInk }}
                                                     >
                                                         {idea.is_used && <Check className="mr-1.5 h-3.5 w-3.5" />}
                                                         {idea.is_used ? 'used' : 'mark used'}
@@ -767,14 +816,15 @@ export default function IdeasPage() {
 
                                                     {idea.isDeleting ? (
                                                         <div className={`flex items-center gap-2 text-xs font-medium border rounded-xl px-3 py-2 ${isDefault ? 'bg-red-50 border-red-100 dark:bg-red-500/10 dark:border-red-500/20' : 'bg-red-500/20 border-red-500/30'}`}>
-                                                            <button onClick={() => confirmDelete(idea.id)} className={`${isDefault ? 'text-red-600 dark:text-red-400' : 'text-red-900'} hover:underline`}>confirm</button>
-                                                            <span className={isDefault ? 'text-ink-faint' : 'text-black/20'}>/</span>
-                                                            <button onClick={() => setIdeas(prev => prev.map(i => i.id === idea.id ? { ...i, isDeleting: false } : i))} className={`${isDefault ? 'text-ink-muted' : 'text-black/60'} hover:underline`}>cancel</button>
+                                                            <button onClick={() => confirmDelete(idea.id)} className={`${isDefault ? 'text-red-600 dark:text-red-400' : 'text-red-200'} hover:underline`}>confirm</button>
+                                                            <span className={isDefault ? 'text-ink-faint' : ''} style={isDefault ? undefined : { color: inkFaint }}>/</span>
+                                                            <button onClick={() => setIdeas(prev => prev.map(i => i.id === idea.id ? { ...i, isDeleting: false } : i))} className={`${isDefault ? 'text-ink-muted' : ''} hover:underline`} style={isDefault ? undefined : { color: cardInk }}>cancel</button>
                                                         </div>
                                                     ) : (
                                                         <button
                                                             onClick={() => setIdeas(prev => prev.map(i => i.id === idea.id ? { ...i, isDeleting: true } : i))}
-                                                            className={`rounded-xl p-2 transition-colors ${isDefault ? 'text-ink-faint hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-500/10' : 'text-black/40 hover:bg-black/10 hover:text-red-700'}`}
+                                                            className={`rounded-xl p-2 transition-colors ${isDefault ? 'text-ink-faint hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-500/10' : 'hover:bg-red-500/30 hover:text-red-200'}`}
+                                                            style={isDefault ? undefined : { color: inkFaint }}
                                                         >
                                                             <Trash2 className="h-4 w-4" />
                                                         </button>

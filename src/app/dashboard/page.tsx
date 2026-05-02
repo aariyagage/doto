@@ -6,7 +6,7 @@ import { Home, Loader2, PlaySquare, Feather, ArrowUpRight } from 'lucide-react'
 import Link from 'next/link'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, Legend } from 'recharts'
 import LogoutButton from './logout-button'
-import AppLayout from '@/components/AppLayout'
+import AppLayout, { displayBg } from '@/components/AppLayout'
 
 interface DashboardStats {
     metrics: {
@@ -110,10 +110,10 @@ export default function DashboardPage() {
                                 {/* Stat cards */}
                                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                                     {[
-                                        { label: 'videos', sub: 'processed', value: stats.metrics.totalVideos, color: 'var(--combo-9-bg)' },
-                                        { label: 'ideas', sub: 'generated', value: stats.metrics.totalIdeas, color: 'var(--combo-5-bg)' },
+                                        { label: 'videos', sub: 'processed', value: stats.metrics.totalVideos, color: 'var(--combo-1-bg)' },
+                                        { label: 'ideas', sub: 'generated', value: stats.metrics.totalIdeas, color: 'var(--combo-2-bg)' },
                                         { label: 'pillars', sub: 'identified', value: stats.metrics.totalPillars, color: 'var(--combo-3-bg)' },
-                                        { label: 'saved', sub: 'bookmarked', value: stats.metrics.totalSavedIdeas, color: 'var(--combo-1-bg)' },
+                                        { label: 'saved', sub: 'bookmarked', value: stats.metrics.totalSavedIdeas, color: 'var(--combo-4-bg)' },
                                     ].map((m) => (
                                         <div key={m.label} className="rounded-2xl border border-rule bg-paper-elevated p-5">
                                             <div className="flex items-baseline gap-2">
@@ -162,7 +162,7 @@ export default function DashboardPage() {
                                                         <Legend iconType="circle" wrapperStyle={{ paddingTop: '20px', fontSize: '12px', color: tickColor }} />
                                                         <Bar dataKey="ideas" name="ideas generated" radius={[4, 4, 0, 0]} maxBarSize={40}>
                                                             {stats.chartData.map((entry, index) => (
-                                                                <Cell key={`cell-ideas-${index}`} fill={entry.color} />
+                                                                <Cell key={`cell-ideas-${index}`} fill={displayBg(entry.color)} />
                                                             ))}
                                                         </Bar>
                                                         <Bar dataKey="videos" name="videos uploaded" fill={videosBarColor} radius={[4, 4, 0, 0]} maxBarSize={40} />

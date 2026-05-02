@@ -6,11 +6,11 @@ import BentoTile from './BentoTile'
 const EASE = [0.25, 1, 0.5, 1] as const
 
 const PILLAR_CHIPS: { label: string; bg: string; text: string }[] = [
-    { label: 'Productivity',           bg: '#B49C84', text: '#FFFFFF' }, // dessert cup
+    { label: 'Productivity',           bg: '#B49C84', text: '#1A1816' }, // dessert cup
     { label: 'Mindset',                bg: '#D97066', text: '#1A1816' }, // rose petals
     { label: 'Founder Diaries',        bg: '#CBD0AF', text: '#1A1816' }, // shop window
     { label: 'Solopreneur Saturdays',  bg: '#481F1F', text: '#FFFFFF' }, // cowboy boots
-    { label: 'Voice',                  bg: '#B49C84', text: '#FFFFFF' }, // dessert cup
+    { label: 'Voice',                  bg: '#B49C84', text: '#1A1816' }, // dessert cup
 ]
 
 const IDEA_CARDS = [
@@ -82,7 +82,7 @@ function TranscriptReveal() {
                 className="mt-6 flex flex-wrap gap-2"
             >
                 {[
-                    { label: 'productivity', n: '01', bg: '#B49C84', text: '#FFFFFF' },
+                    { label: 'productivity', n: '01', bg: '#B49C84', text: '#1A1816' },
                     { label: 'mindset',      n: '02', bg: '#D97066', text: '#1A1816' },
                 ].map(p => (
                     <span

@@ -38,3 +38,9 @@ jobs:
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          # Reddit OAuth — required because Reddit returns 403 to unauthenticated
+          # requests from datacenter IPs (GitHub Actions). If unset, the Reddit
+          # section of the cron is skipped and the run still succeeds with TikTok
+          # data only.
+          REDDIT_CLIENT_ID: ${{ secrets.REDDIT_CLIENT_ID }}
+          REDDIT_CLIENT_SECRET: ${{ secrets.REDDIT_CLIENT_SECRET }}

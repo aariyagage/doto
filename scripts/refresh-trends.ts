@@ -45,12 +45,18 @@ const PER_INDUSTRY_LIMIT = 50;
 const INTER_REQUEST_DELAY_MS = 1000;
 const HEADER_CAPTURE_TIMEOUT_MS = 30_000;
 
-// Reddit unauth limit is 10 req/min from one IP. 6500ms throttle = ~9.2 req/min.
-const REDDIT_INTER_REQUEST_DELAY_MS = 6500;
+// Reddit blocks unauthenticated requests from datacenter IPs (GitHub Actions),
+// returning HTTP 403 across the board. OAuth client_credentials flow lifts the
+// rate limit to ~100 req/min and Reddit doesn't block authed cloud requests.
+// Throttle to 2s (30 req/min) to stay safely under the published "60 req/min"
+// guidance. With 28 subs that's ~1 min of Reddit fetch time.
+const REDDIT_INTER_REQUEST_DELAY_MS = 2000;
 const REDDIT_PER_SUB_LIMIT = 15;
 // HTTP headers must be ASCII-only — keep this string ASCII (no em dashes,
 // smart quotes, etc.) or Node fetch will throw "ByteString" errors.
 const REDDIT_USER_AGENT = 'Doto/1.0 (+https://doto.app) content-idea-trend-monitor';
+const REDDIT_TOKEN_URL = 'https://www.reddit.com/api/v1/access_token';
+const REDDIT_API_BASE = 'https://oauth.reddit.com';
 
 type TrendRow = {
     hashtag_id: string;
@@ -170,10 +176,36 @@ type RedditRow = {
     source: string;
 };
 
-async function fetchSubreddit(name: string): Promise<RedditRow[]> {
-    const url = `https://www.reddit.com/r/${name}/hot.json?limit=${REDDIT_PER_SUB_LIMIT}`;
+async function getRedditToken(): Promise<string | null> {
+    const clientId = process.env.REDDIT_CLIENT_ID;
+    const clientSecret = process.env.REDDIT_CLIENT_SECRET;
+    if (!clientId || !clientSecret) return null;
+
+    const basic = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
+    const res = await fetch(REDDIT_TOKEN_URL, {
+        method: 'POST',
+        headers: {
+            'Authorization': `Basic ${basic}`,
+            'User-Agent': REDDIT_USER_AGENT,
+            'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: 'grant_type=client_credentials',
+    });
+    if (!res.ok) {
+        throw new Error(`Reddit token fetch failed: HTTP ${res.status} ${await res.text().catch(() => '')}`);
+    }
+    const json = await res.json() as { access_token?: string };
+    if (!json.access_token) throw new Error('Reddit token response missing access_token');
+    return json.access_token;
+}
+
+async function fetchSubreddit(name: string, token: string): Promise<RedditRow[]> {
+    const url = `${REDDIT_API_BASE}/r/${name}/hot.json?limit=${REDDIT_PER_SUB_LIMIT}`;
     const res = await fetch(url, {
-        headers: { 'User-Agent': REDDIT_USER_AGENT },
+        headers: {
+            'Authorization': `Bearer ${token}`,
+            'User-Agent': REDDIT_USER_AGENT,
+        },
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const json = await res.json() as { data?: { children?: { data?: Record<string, unknown> }[] } };
@@ -243,11 +275,25 @@ async function refreshTikTok(supabase: SupaClient): Promise<{ rows: number; fail
 async function refreshReddit(supabase: SupaClient): Promise<{ rows: number; failed: string[] }> {
     let rows = 0;
     const failed: string[] = [];
-    console.log(`[refresh-trends/reddit] fetching ${SUBREDDITS.length} subreddits`);
+
+    let token: string | null = null;
+    try {
+        token = await getRedditToken();
+    } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error(`[refresh-trends/reddit] token fetch failed, skipping Reddit: ${msg}`);
+        return { rows: 0, failed: ['reddit:auth'] };
+    }
+    if (!token) {
+        console.warn('[refresh-trends/reddit] REDDIT_CLIENT_ID/SECRET not set — skipping Reddit fetch');
+        return { rows: 0, failed: [] };
+    }
+
+    console.log(`[refresh-trends/reddit] authed; fetching ${SUBREDDITS.length} subreddits`);
 
     for (const sub of SUBREDDITS) {
         try {
-            const data = await fetchSubreddit(sub.name);
+            const data = await fetchSubreddit(sub.name, token);
             if (data.length === 0) {
                 console.warn(`[refresh-trends/reddit] r/${sub.name}: 0 posts (skipping upsert)`);
                 await sleep(REDDIT_INTER_REQUEST_DELAY_MS);

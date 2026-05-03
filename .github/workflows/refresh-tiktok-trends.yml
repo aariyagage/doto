@@ -1,12 +1,12 @@
 name: Refresh TikTok trends
 
 on:
-  # Daily at 05:00 UTC. Pick a quiet hour for TikTok's servers; data is
-  # window-based (rolling 7-day) so the exact wall-clock time doesn't matter
-  # as long as we run roughly daily.
-  schedule:
-    - cron: '0 5 * * *'
-  # Manual trigger — useful for first-time backfill and post-failure recovery.
+  # Schedule disabled — trends feature is parked on the feature/trends branch
+  # while we figure out a non-Reddit data source. Re-enable by uncommenting
+  # the schedule block below; manual triggers (workflow_dispatch) still work.
+  #
+  # schedule:
+  #   - cron: '0 5 * * *'
   workflow_dispatch:
 
 # Only one refresh in flight at a time. Cancel an older run if a new one fires.

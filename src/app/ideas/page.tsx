@@ -5,7 +5,6 @@ import { createClient } from '@/lib/supabase/client'
 import { Bookmark, Trash2, ChevronDown, ChevronUp, Loader2, Sparkles, Check, RefreshCw, X, Star } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import AppLayout, { displayBg, getPairedTextColor } from '@/components/AppLayout'
-import TrendsPanel from '@/components/trends/TrendsPanel'
 
 interface Pillar {
     id: string;
@@ -624,23 +623,6 @@ export default function IdeasPage() {
                                 </button>
                             ))}
                         </div>
-
-                        {/* TikTok trends panel — only when exactly one pillar is selected so the
-                            scope is unambiguous. Hidden in "all ideas" view (selectedPillars=[])
-                            and when multiple pillars are selected (would have to merge industries). */}
-                        {selectedPillars.length === 1 && (() => {
-                            const focused = pillars.find(p => p.id === selectedPillars[0]);
-                            if (!focused) return null;
-                            return (
-                                <TrendsPanel
-                                    pillarId={focused.id}
-                                    pillarName={focused.name}
-                                    onIdeaGenerated={(idea) => setIdeas(prev => [{ ...(idea as unknown as Idea), isExpanded: false, isDeleting: false }, ...prev])}
-                                    onMessage={showToast}
-                                    getToken={getToken}
-                                />
-                            );
-                        })()}
 
                         {/* Ideas List */}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-20">

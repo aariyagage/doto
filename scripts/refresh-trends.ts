@@ -48,7 +48,9 @@ const HEADER_CAPTURE_TIMEOUT_MS = 30_000;
 // Reddit unauth limit is 10 req/min from one IP. 6500ms throttle = ~9.2 req/min.
 const REDDIT_INTER_REQUEST_DELAY_MS = 6500;
 const REDDIT_PER_SUB_LIMIT = 15;
-const REDDIT_USER_AGENT = 'Doto/1.0 (+https://doto.app — content idea trend monitor)';
+// HTTP headers must be ASCII-only — keep this string ASCII (no em dashes,
+// smart quotes, etc.) or Node fetch will throw "ByteString" errors.
+const REDDIT_USER_AGENT = 'Doto/1.0 (+https://doto.app) content-idea-trend-monitor';
 
 type TrendRow = {
     hashtag_id: string;

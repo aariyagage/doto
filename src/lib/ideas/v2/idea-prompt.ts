@@ -28,16 +28,29 @@ export type V2PillarContext = {
 };
 
 // Optional anchor for trend-driven generation. When present, the prompt asks
-// the model to find an HONEST intersection between the trending hashtag and
-// the creator's territory — and to return a no_fit signal if no honest
-// intersection exists, rather than fabricate one.
-export type TrendAnchor = {
-    hashtag: string;                   // e.g. "#prom2026" (with or without leading #)
-    viewCount: number | null;
-    rank: number | null;
-    rankDirection: 'up' | 'down' | 'same' | 'new' | null;
-    industryName: string | null;       // human-friendly name of the TikTok industry
-};
+// the model to find an HONEST intersection between the trend and the creator's
+// territory — and to return a no_fit signal if no honest intersection exists,
+// rather than fabricate one.
+//
+// Discriminated union so the same generation path can anchor to either a
+// trending TikTok hashtag or a hot Reddit post. The buildTrendAnchorBlock
+// helper renders the correct anchor text per kind.
+export type TrendAnchor =
+    | {
+        kind: 'tiktok_hashtag';
+        hashtag: string;                   // e.g. "#prom2026" (with or without leading #)
+        viewCount: number | null;
+        rank: number | null;
+        rankDirection: 'up' | 'down' | 'same' | 'new' | null;
+        industryName: string | null;       // human-friendly TikTok industry name
+    }
+    | {
+        kind: 'reddit_post';
+        title: string;                     // verbatim post title
+        subreddit: string;                 // without r/ prefix
+        score: number | null;              // upvotes
+        commentCount: number | null;
+    };
 
 export const V2_SYSTEM_MESSAGE = [
     'You are a senior creative director for a short-form-video creator. You produce ONE idea at a time. The creator\'s transcripts are your reference for their VOICE, TONE, and WORLDVIEW — not a constraint on which topics you can propose.',
@@ -110,20 +123,40 @@ function formatViewCount(n: number | null): string {
 }
 
 function buildTrendAnchorBlock(anchor: TrendAnchor): string {
-    const tag = anchor.hashtag.startsWith('#') ? anchor.hashtag : `#${anchor.hashtag}`;
-    const stats: string[] = [formatViewCount(anchor.viewCount)];
-    if (anchor.rank != null) stats.push(`rank #${anchor.rank}`);
-    if (anchor.rankDirection === 'up') stats.push('trending up');
-    else if (anchor.rankDirection === 'down') stats.push('trending down');
-    else if (anchor.rankDirection === 'new') stats.push('new on board');
-    const niche = anchor.industryName ? ` in the ${anchor.industryName} category` : '';
+    if (anchor.kind === 'tiktok_hashtag') {
+        const tag = anchor.hashtag.startsWith('#') ? anchor.hashtag : `#${anchor.hashtag}`;
+        const stats: string[] = [formatViewCount(anchor.viewCount)];
+        if (anchor.rank != null) stats.push(`rank #${anchor.rank}`);
+        if (anchor.rankDirection === 'up') stats.push('trending up');
+        else if (anchor.rankDirection === 'down') stats.push('trending down');
+        else if (anchor.rankDirection === 'new') stats.push('new on board');
+        const niche = anchor.industryName ? ` in the ${anchor.industryName} category` : '';
+
+        return [
+            '',
+            '== TREND ANCHOR ==',
+            `The creator wants to make a video that participates in ${tag} (currently ${stats.join(', ')}${niche} on TikTok this week).`,
+            'Find an angle inside the creator\'s actual territory (per voice + transcripts) that has an HONEST intersection with this trend. The intersection must feel native to the creator — a real thing they would observe, believe, or do — not a forced jump onto a topic they don\'t credibly inhabit.',
+            'The trend is a starting point, not a topic mandate. The idea still has to follow every other rule above: anchor to the creator\'s territory, no fabrication, no meta-content, real-world specificity, observation-not-lesson shape.',
+        ].join('\n');
+    }
+
+    // reddit_post — anchor to the underlying conversation, not the title itself.
+    // Reddit titles can be sensational or specific to one user's situation; the
+    // creator is responding to the broader topic the post is part of, not
+    // re-telling it.
+    const stats: string[] = [];
+    if (anchor.score != null) stats.push(`${anchor.score} upvotes`);
+    if (anchor.commentCount != null) stats.push(`${anchor.commentCount} comments`);
+    const statsLine = stats.length > 0 ? ` (currently ${stats.join(', ')})` : '';
 
     return [
         '',
         '== TREND ANCHOR ==',
-        `The creator wants to make a video that participates in ${tag} (currently ${stats.join(', ')}${niche} on TikTok this week).`,
-        'Find an angle inside the creator\'s actual territory (per voice + transcripts) that has an HONEST intersection with this trend. The intersection must feel native to the creator — a real thing they would observe, believe, or do — not a forced jump onto a topic they don\'t credibly inhabit.',
-        'The trend is a starting point, not a topic mandate. The idea still has to follow every other rule above: anchor to the creator\'s territory, no fabrication, no meta-content, real-world specificity, observation-not-lesson shape.',
+        `The creator wants to make a video that responds to the conversation around this trending Reddit post in r/${anchor.subreddit}:`,
+        `"${anchor.title}"${statsLine}.`,
+        'Find an angle inside the creator\'s actual territory (per voice + transcripts) that has an HONEST intersection with the underlying TOPIC this post is part of — not the post itself, not a paraphrase of the title, not the specific person\'s situation. The conversation matters; the post is just one entry into it. The intersection must feel native to the creator.',
+        'The Reddit post is a starting point, not a topic mandate. The idea still has to follow every other rule above: anchor to the creator\'s territory, no fabrication, no meta-content, real-world specificity, observation-not-lesson shape.',
     ].join('\n');
 }
 

@@ -3,22 +3,24 @@
 import { useEffect, useState } from 'react';
 import { Loader2, Flame, Pencil, Check, X } from 'lucide-react';
 import TrendChip, { type TrendChipData } from './TrendChip';
+import RedditTrendCard, { type RedditTrendData } from './RedditTrendCard';
 import { TIKTOK_INDUSTRIES } from '@/lib/trends/industries';
 
 type TrendsResponse = {
-    trends: TrendChipData[];
+    source: 'tiktok' | 'reddit' | null;
+    trends: TrendChipData[] | RedditTrendData[];
     industryName: string | null;
+    subreddits: string[];
     lastRefresh: string | null;
     isStale: boolean;
     needsMapping: boolean;
+    industryScore?: number | null;
 };
 
 type Props = {
     pillarId: string;
     pillarName: string;
-    /** Called when a trend successfully produces a new idea — parent prepends it to the grid. */
     onIdeaGenerated: (idea: Record<string, unknown>) => void;
-    /** Toast hook from the parent page. */
     onMessage: (msg: string) => void;
     getToken: () => Promise<string | undefined>;
 };
@@ -109,24 +111,42 @@ export default function TrendsPanel({ pillarId, pillarName, onIdeaGenerated, onM
         }
     };
 
+    // Source-specific subtitle for the header.
+    const sourceLabel = (() => {
+        if (!data) return '';
+        if (data.source === 'tiktok') {
+            return data.industryName ? `via tiktok · ${data.industryName.toLowerCase()}` : 'via tiktok';
+        }
+        if (data.source === 'reddit') {
+            const subs = data.subreddits.slice(0, 3).map(s => `r/${s}`).join(' · ');
+            return subs ? `via reddit · ${subs}` : 'via reddit';
+        }
+        return '';
+    })();
+
+    const isReddit = data?.source === 'reddit';
+    const hasTrends = data?.trends && data.trends.length > 0;
+
     return (
         <div className="rounded-2xl border border-rule bg-paper-elevated/60 px-5 py-4">
-            <div className="flex items-baseline justify-between gap-3 mb-3">
+            <div className="flex items-baseline justify-between gap-3 mb-3 flex-wrap">
                 <div className="flex items-center gap-2 flex-wrap">
                     <Flame className="h-4 w-4 text-ink-muted" />
                     <h3 className="text-sm font-semibold text-ink">
                         trending in {pillarName.toLowerCase()} this week
                     </h3>
-                    {!isEditingNiche && data?.industryName && (
+                    {!isEditingNiche && data?.source && sourceLabel && (
                         <span className="text-[10px] uppercase tracking-wide text-ink-faint flex items-center gap-1">
-                            via tiktok · {data.industryName.toLowerCase()}
-                            <button
-                                onClick={startEditNiche}
-                                className="ml-1 hover:text-ink-muted transition-colors"
-                                title="Change niche"
-                            >
-                                <Pencil className="h-2.5 w-2.5" />
-                            </button>
+                            {sourceLabel}
+                            {data.source === 'tiktok' && (
+                                <button
+                                    onClick={startEditNiche}
+                                    className="ml-1 hover:text-ink-muted transition-colors"
+                                    title="Change tiktok niche"
+                                >
+                                    <Pencil className="h-2.5 w-2.5" />
+                                </button>
+                            )}
                         </span>
                     )}
                     {isEditingNiche && (
@@ -136,7 +156,7 @@ export default function TrendsPanel({ pillarId, pillarName, onIdeaGenerated, onM
                                 onChange={(e) => setPendingNiche(e.target.value)}
                                 className="text-[10px] border border-rule rounded px-2 py-0.5 bg-paper-elevated text-ink"
                             >
-                                <option value="">— pick a niche —</option>
+                                <option value="">— pick a tiktok niche —</option>
                                 {TIKTOK_INDUSTRIES.map(i => (
                                     <option key={i.id} value={i.id}>{i.name}</option>
                                 ))}
@@ -178,26 +198,26 @@ export default function TrendsPanel({ pillarId, pillarName, onIdeaGenerated, onM
 
             {!isLoading && !errorMsg && data?.needsMapping && !isEditingNiche && (
                 <div className="text-xs text-ink-muted py-2 flex items-center gap-2">
-                    <span>we couldn&apos;t auto-detect a tiktok niche for this pillar.</span>
+                    <span>we couldn&apos;t auto-detect a niche for this pillar.</span>
                     <button
                         onClick={startEditNiche}
                         className="font-medium text-blue-600 hover:underline"
                     >
-                        pick one →
+                        pick a tiktok niche →
                     </button>
                 </div>
             )}
 
-            {!isLoading && !errorMsg && !data?.needsMapping && data?.trends.length === 0 && (
+            {!isLoading && !errorMsg && data && !data.needsMapping && !hasTrends && (
                 <p className="text-xs text-ink-muted py-2">
                     no trends yet — first batch lands within 24 hours of the daily refresh.
                 </p>
             )}
 
-            {!isLoading && !errorMsg && data && data.trends.length > 0 && (
+            {!isLoading && !errorMsg && data && hasTrends && !isReddit && (
                 <>
                     <div className="flex flex-wrap gap-2">
-                        {data.trends.map(t => (
+                        {(data.trends as TrendChipData[]).map(t => (
                             <TrendChip
                                 key={t.hashtag_id}
                                 trend={t}
@@ -210,6 +230,26 @@ export default function TrendsPanel({ pillarId, pillarName, onIdeaGenerated, onM
                     </div>
                     <p className="mt-2 text-[10px] text-ink-faint">
                         click any hashtag to generate an idea anchored to that trend, in your voice.
+                    </p>
+                </>
+            )}
+
+            {!isLoading && !errorMsg && data && hasTrends && isReddit && (
+                <>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                        {(data.trends as RedditTrendData[]).map(p => (
+                            <RedditTrendCard
+                                key={p.post_id}
+                                post={p}
+                                pillarId={pillarId}
+                                onIdea={onIdeaGenerated}
+                                onMessage={onMessage}
+                                getToken={getToken}
+                            />
+                        ))}
+                    </div>
+                    <p className="mt-2 text-[10px] text-ink-faint">
+                        click any discussion to generate an idea responding to its underlying topic, in your voice.
                     </p>
                 </>
             )}

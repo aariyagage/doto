@@ -17,7 +17,8 @@ concurrency:
 jobs:
   refresh:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    # TikTok ~30s + Reddit ~3min (28 subs × 6.5s throttle) + buffer.
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
 

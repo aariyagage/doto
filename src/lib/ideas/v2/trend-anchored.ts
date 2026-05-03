@@ -137,18 +137,31 @@ export async function generateOneIdeaFromTrend(args: {
         return { kind: 'no_fit', reason: 'This trend produced an idea too similar to one already in your saved/used list. Try a different trend.' };
     }
 
+    // Anchor description for the reasoning blob + the right source_* column.
+    let anchorDescription: string;
+    let sourceColumns: { source_trend_hashtag?: string; source_trend_reddit_post?: string };
+    if (trendAnchor.kind === 'tiktok_hashtag') {
+        const tag = trendAnchor.hashtag.startsWith('#') ? trendAnchor.hashtag : `#${trendAnchor.hashtag}`;
+        anchorDescription = `Trend anchor: ${tag} (TikTok)`;
+        sourceColumns = { source_trend_hashtag: tag };
+    } else {
+        anchorDescription = `Trend anchor: r/${trendAnchor.subreddit} — "${trendAnchor.title}"`;
+        // Reddit doesn't expose post_id on the TrendAnchor for prompt cleanliness;
+        // the route layer already knows it and persists the storage key. Here we
+        // store a human-readable pointer so the row is still self-describing.
+        sourceColumns = { source_trend_reddit_post: `r/${trendAnchor.subreddit}: ${trendAnchor.title.slice(0, 100)}` };
+    }
+
     const reasoningParts = [
         prepared.idea,
         prepared.execution ? `Execution: ${prepared.execution}` : null,
-        `Trend anchor: ${trendAnchor.hashtag}`,
+        anchorDescription,
         `Angle: ${angle.name}`,
         `Packaging: ${packaging.label}`,
         prepared.tensionType ? `Tension: ${prepared.tensionType}` : null,
         prepared.format ? `Format: ${prepared.format}` : null,
         prepared.anchorQuote ? `Anchor quote: ${prepared.anchorQuote}` : null,
     ].filter(Boolean);
-
-    const tagForStorage = trendAnchor.hashtag.startsWith('#') ? trendAnchor.hashtag : `#${trendAnchor.hashtag}`;
 
     const { data: row, error: insertError } = await supabase
         .from('content_ideas')
@@ -163,7 +176,7 @@ export async function generateOneIdeaFromTrend(args: {
             packaging_type: packaging.id,
             idea_embedding: embedding,
             source_version: 'v2',
-            source_trend_hashtag: tagForStorage,
+            ...sourceColumns,
             is_saved: false,
             is_used: false,
         })

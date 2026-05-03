@@ -9,10 +9,12 @@ export const dynamic = 'force-dynamic';
 
 type Body = {
     pillarId?: unknown;
+    kind?: unknown;
     hashtagId?: unknown;
+    postId?: unknown;
 };
 
-const RANK_DIFF_TYPE_TO_DIRECTION: Record<number, TrendAnchor['rankDirection']> = {
+const RANK_DIFF_TYPE_TO_DIRECTION: Record<number, 'up' | 'same' | 'down' | 'new'> = {
     1: 'up',
     2: 'same',
     3: 'down',
@@ -40,15 +42,20 @@ export async function POST(request: Request) {
         let body: Body = {};
         try { body = await request.json(); } catch {}
         const pillarId = typeof body.pillarId === 'string' ? body.pillarId : null;
-        const hashtagId = typeof body.hashtagId === 'string' ? body.hashtagId : null;
-        if (!pillarId || !hashtagId) {
-            return NextResponse.json({ error: 'pillarId and hashtagId are required.' }, { status: 400 });
+        // Default kind = 'tiktok_hashtag' when only hashtagId is sent so the
+        // existing TrendChip clients keep working without a body change.
+        const kind = body.kind === 'reddit_post' ? 'reddit_post'
+            : body.kind === 'tiktok_hashtag' ? 'tiktok_hashtag'
+            : (typeof body.hashtagId === 'string' ? 'tiktok_hashtag' : null);
+
+        if (!pillarId || !kind) {
+            return NextResponse.json({ error: 'pillarId and a valid kind (or hashtagId) are required.' }, { status: 400 });
         }
 
-        // Verify pillar ownership and pull mapping context for the prompt.
+        // Verify pillar ownership and pull mapping context.
         const { data: pillar, error: pillarError } = await supabase
             .from('pillars')
-            .select('id, tiktok_industry_id, tiktok_industry_secondary')
+            .select('id, tiktok_industry_id, tiktok_industry_secondary, reddit_subreddits')
             .eq('id', pillarId)
             .eq('user_id', user.id)
             .maybeSingle();
@@ -59,36 +66,77 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'Pillar not found.' }, { status: 404 });
         }
 
-        const industryIds = [pillar.tiktok_industry_id, pillar.tiktok_industry_secondary].filter(Boolean) as string[];
+        let trendAnchor: TrendAnchor;
 
-        // Fetch the latest snapshot of the requested hashtag scoped to the
-        // pillar's mapped industries — prevents generating from a trend that
-        // belongs to a totally unrelated category by accident.
-        const { data: trendRow, error: trendError } = await supabase
-            .from('tiktok_trends')
-            .select('hashtag_id, hashtag_name, industry_id, rank, rank_diff_type, video_views')
-            .eq('hashtag_id', hashtagId)
-            .in('industry_id', industryIds.length > 0 ? industryIds : ['__none__'])
-            .order('fetched_at', { ascending: false })
-            .limit(1)
-            .maybeSingle();
-        if (trendError) {
-            return NextResponse.json({ error: trendError.message }, { status: 500 });
-        }
-        if (!trendRow) {
-            return NextResponse.json({ error: 'Trend not found for this pillar.' }, { status: 404 });
-        }
+        if (kind === 'tiktok_hashtag') {
+            const hashtagId = typeof body.hashtagId === 'string' ? body.hashtagId : null;
+            if (!hashtagId) {
+                return NextResponse.json({ error: 'hashtagId is required for tiktok_hashtag kind.' }, { status: 400 });
+            }
 
-        const industry = getIndustryById(trendRow.industry_id);
-        const trendAnchor: TrendAnchor = {
-            hashtag: trendRow.hashtag_name,
-            viewCount: trendRow.video_views ?? null,
-            rank: trendRow.rank ?? null,
-            rankDirection: trendRow.rank_diff_type != null
-                ? (RANK_DIFF_TYPE_TO_DIRECTION[trendRow.rank_diff_type] ?? null)
-                : null,
-            industryName: industry?.name ?? null,
-        };
+            const industryIds = [pillar.tiktok_industry_id, pillar.tiktok_industry_secondary].filter(Boolean) as string[];
+
+            const { data: trendRow, error: trendError } = await supabase
+                .from('tiktok_trends')
+                .select('hashtag_id, hashtag_name, industry_id, rank, rank_diff_type, video_views')
+                .eq('hashtag_id', hashtagId)
+                .in('industry_id', industryIds.length > 0 ? industryIds : ['__none__'])
+                .order('fetched_at', { ascending: false })
+                .limit(1)
+                .maybeSingle();
+            if (trendError) {
+                return NextResponse.json({ error: trendError.message }, { status: 500 });
+            }
+            if (!trendRow) {
+                return NextResponse.json({ error: 'Trend not found for this pillar.' }, { status: 404 });
+            }
+
+            const industry = getIndustryById(trendRow.industry_id);
+            trendAnchor = {
+                kind: 'tiktok_hashtag',
+                hashtag: trendRow.hashtag_name,
+                viewCount: trendRow.video_views ?? null,
+                rank: trendRow.rank ?? null,
+                rankDirection: trendRow.rank_diff_type != null
+                    ? (RANK_DIFF_TYPE_TO_DIRECTION[trendRow.rank_diff_type] ?? null)
+                    : null,
+                industryName: industry?.name ?? null,
+            };
+        } else {
+            // reddit_post
+            const postId = typeof body.postId === 'string' ? body.postId : null;
+            if (!postId) {
+                return NextResponse.json({ error: 'postId is required for reddit_post kind.' }, { status: 400 });
+            }
+
+            const subreddits = ((pillar.reddit_subreddits as string[] | null) ?? []).map(s => s.toLowerCase());
+            if (subreddits.length === 0) {
+                return NextResponse.json({ error: 'Pillar has no mapped subreddits.' }, { status: 404 });
+            }
+
+            const { data: postRow, error: postError } = await supabase
+                .from('reddit_trends')
+                .select('post_id, subreddit, title, score, num_comments')
+                .eq('post_id', postId)
+                .in('subreddit', subreddits)
+                .order('fetched_at', { ascending: false })
+                .limit(1)
+                .maybeSingle();
+            if (postError) {
+                return NextResponse.json({ error: postError.message }, { status: 500 });
+            }
+            if (!postRow) {
+                return NextResponse.json({ error: 'Reddit post not found for this pillar.' }, { status: 404 });
+            }
+
+            trendAnchor = {
+                kind: 'reddit_post',
+                title: postRow.title,
+                subreddit: postRow.subreddit,
+                score: postRow.score ?? null,
+                commentCount: postRow.num_comments ?? null,
+            };
+        }
 
         const result = await generateOneIdeaFromTrend({
             supabase,

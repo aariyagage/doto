@@ -27,6 +27,18 @@ export type V2PillarContext = {
     transcriptRaw: string;             // joined raw text, used for grounding checks downstream
 };
 
+// Optional anchor for trend-driven generation. When present, the prompt asks
+// the model to find an HONEST intersection between the trending hashtag and
+// the creator's territory — and to return a no_fit signal if no honest
+// intersection exists, rather than fabricate one.
+export type TrendAnchor = {
+    hashtag: string;                   // e.g. "#prom2026" (with or without leading #)
+    viewCount: number | null;
+    rank: number | null;
+    rankDirection: 'up' | 'down' | 'same' | 'new' | null;
+    industryName: string | null;       // human-friendly name of the TikTok industry
+};
+
 export const V2_SYSTEM_MESSAGE = [
     'You are a senior creative director for a short-form-video creator. You produce ONE idea at a time. The creator\'s transcripts are your reference for their VOICE, TONE, and WORLDVIEW — not a constraint on which topics you can propose.',
     '',
@@ -89,6 +101,32 @@ function nonEmpty(arr: (string | null | undefined)[] | null | undefined): string
     return (arr || []).map(s => (s || '').trim()).filter(s => s.length > 0);
 }
 
+function formatViewCount(n: number | null): string {
+    if (n == null || !Number.isFinite(n)) return 'unknown views';
+    if (n >= 1_000_000_000) return `${(n / 1_000_000_000).toFixed(1)}B views`;
+    if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M views`;
+    if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K views`;
+    return `${n} views`;
+}
+
+function buildTrendAnchorBlock(anchor: TrendAnchor): string {
+    const tag = anchor.hashtag.startsWith('#') ? anchor.hashtag : `#${anchor.hashtag}`;
+    const stats: string[] = [formatViewCount(anchor.viewCount)];
+    if (anchor.rank != null) stats.push(`rank #${anchor.rank}`);
+    if (anchor.rankDirection === 'up') stats.push('trending up');
+    else if (anchor.rankDirection === 'down') stats.push('trending down');
+    else if (anchor.rankDirection === 'new') stats.push('new on board');
+    const niche = anchor.industryName ? ` in the ${anchor.industryName} category` : '';
+
+    return [
+        '',
+        '== TREND ANCHOR ==',
+        `The creator wants to make a video that participates in ${tag} (currently ${stats.join(', ')}${niche} on TikTok this week).`,
+        'Find an angle inside the creator\'s actual territory (per voice + transcripts) that has an HONEST intersection with this trend. The intersection must feel native to the creator — a real thing they would observe, believe, or do — not a forced jump onto a topic they don\'t credibly inhabit.',
+        'The trend is a starting point, not a topic mandate. The idea still has to follow every other rule above: anchor to the creator\'s territory, no fabrication, no meta-content, real-world specificity, observation-not-lesson shape.',
+    ].join('\n');
+}
+
 function voiceBlock(vp: V2VoiceProfile): string {
     const lines: string[] = [];
     lines.push(`Niche: ${vp.niche_summary ?? '(none)'}`);
@@ -129,8 +167,9 @@ export function buildV2UserMessage(params: {
     pillar: V2PillarContext;
     angle: Angle;
     packaging: PackagingType;
+    trendAnchor?: TrendAnchor;
 }): string {
-    const { voiceProfile, pillar, angle, packaging } = params;
+    const { voiceProfile, pillar, angle, packaging, trendAnchor } = params;
 
     const subtopicsLine = pillar.subtopicsAlreadyCovered.length > 0
         ? pillar.subtopicsAlreadyCovered.join(', ')
@@ -149,6 +188,14 @@ export function buildV2UserMessage(params: {
         ].join('\n')
         : '';
 
+    const trendBlock = trendAnchor
+        ? buildTrendAnchorBlock(trendAnchor)
+        : '';
+
+    const trendAssignmentSuffix = trendAnchor
+        ? '\n\nHowever, if there is NO honest intersection between this trend and the creator\'s actual territory — if making them participate would feel forced, off-niche, or require fabricating territory they don\'t inhabit — return this object instead of an idea: { "no_fit": true, "reason": "<one sentence explaining why this trend doesn\'t fit>" }. The bar is honesty, not coverage. A confident "no_fit" beats a forced idea.'
+        : '';
+
     return [
         '== CREATOR VOICE ==',
         voiceBlock(voiceProfile),
@@ -158,6 +205,7 @@ export function buildV2UserMessage(params: {
         pillar.description ? `Description: ${pillar.description}` : '',
         `Subtopics this creator has ALREADY covered under this pillar — do NOT retread these: ${subtopicsLine}`,
         seriesBlock,
+        trendBlock,
         '',
         '== TRANSCRIPT ESSENCES (ranked by relevance to this pillar) ==',
         essenceBlock,
@@ -170,9 +218,9 @@ export function buildV2UserMessage(params: {
         `Packaging: ${packaging.label}`,
         `Hook contract: ${packaging.hookContract}`,
         '',
-        pillar.isSeries
+        (pillar.isSeries
             ? 'Generate exactly ONE idea using the assigned angle and packaging. The topic MUST be new — not any of the subtopics listed above, and not a paraphrase of any past episode. Use the past episodes to match the series\' voice/format AND to stay anchored inside the creator\'s actual territory — never as content to restate.'
-            : 'Generate exactly ONE idea using the assigned angle and packaging. The idea MUST be NEW — push into a sub-area the creator has not yet covered, not a paraphrase or re-framing of anything in the transcripts. Use the transcripts to match voice AND to stay anchored inside the thematic territory the creator actually inhabits — never as a source of topics to copy.',
+            : 'Generate exactly ONE idea using the assigned angle and packaging. The idea MUST be NEW — push into a sub-area the creator has not yet covered, not a paraphrase or re-framing of anything in the transcripts. Use the transcripts to match voice AND to stay anchored inside the thematic territory the creator actually inhabits — never as a source of topics to copy.') + trendAssignmentSuffix,
         '',
         'Return ONLY this JSON (no extra fields, no preamble):',
         '{',

@@ -1,0 +1,39 @@
+name: Refresh TikTok trends
+
+on:
+  # Daily at 05:00 UTC. Pick a quiet hour for TikTok's servers; data is
+  # window-based (rolling 7-day) so the exact wall-clock time doesn't matter
+  # as long as we run roughly daily.
+  schedule:
+    - cron: '0 5 * * *'
+  # Manual trigger — useful for first-time backfill and post-failure recovery.
+  workflow_dispatch:
+
+# Only one refresh in flight at a time. Cancel an older run if a new one fires.
+concurrency:
+  group: refresh-tiktok-trends
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      # Only install what the script needs. The full app dep set isn't required
+      # here, but `npm ci` is the simplest/most reproducible option.
+      - run: npm ci
+
+      # Chromium binary for Playwright. ~150MB — runs in seconds on a GH runner.
+      - run: npx playwright install --with-deps chromium
+
+      - run: npx tsx scripts/refresh-trends.ts
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}

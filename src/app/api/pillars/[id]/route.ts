@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { getIndustryById } from '@/lib/trends/industries';
 
 export async function DELETE(request: Request, { params }: { params: { id: string } }) {
     try {
@@ -40,7 +41,12 @@ export async function PATCH(request: Request, { params }: { params: { id: string
 
         const { id } = await params;
         const body = await request.json();
-        const { name, is_series } = body as { name?: unknown; is_series?: unknown };
+        const { name, is_series, tiktok_industry_id, tiktok_industry_secondary } = body as {
+            name?: unknown;
+            is_series?: unknown;
+            tiktok_industry_id?: unknown;
+            tiktok_industry_secondary?: unknown;
+        };
 
         const updates: Record<string, unknown> = {};
         if (typeof name === 'string') {
@@ -50,6 +56,24 @@ export async function PATCH(request: Request, { params }: { params: { id: string
         }
         if (typeof is_series === 'boolean') {
             updates.is_series = is_series;
+        }
+        // Manual TikTok industry override. Setting tiktok_industry_id locks the
+        // mapping so the lazy auto-mapper at /api/trends won't overwrite it.
+        // Pass null to clear the override and re-enable auto-mapping.
+        if (tiktok_industry_id !== undefined) {
+            if (tiktok_industry_id === null) {
+                updates.tiktok_industry_id = null;
+                updates.tiktok_industry_secondary = null;
+                updates.tiktok_industry_locked = false;
+            } else if (typeof tiktok_industry_id === 'string' && getIndustryById(tiktok_industry_id)) {
+                updates.tiktok_industry_id = tiktok_industry_id;
+                updates.tiktok_industry_locked = true;
+                if (tiktok_industry_secondary === null || typeof tiktok_industry_secondary === 'string') {
+                    updates.tiktok_industry_secondary = tiktok_industry_secondary;
+                }
+            } else {
+                return NextResponse.json({ error: 'Unknown tiktok_industry_id' }, { status: 400 });
+            }
         }
         if (Object.keys(updates).length === 0) {
             return NextResponse.json({ error: 'No updatable fields provided' }, { status: 400 });

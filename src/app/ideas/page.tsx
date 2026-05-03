@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import { Bookmark, Trash2, ChevronDown, ChevronUp, Loader2, Sparkles, Check, RefreshCw, X, Star } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import AppLayout, { displayBg, getPairedTextColor } from '@/components/AppLayout'
+import PillarFolderChip, { AllIdeasFolderChip } from '@/components/PillarFolderChip'
 
 interface Pillar {
     id: string;
@@ -525,14 +526,10 @@ export default function IdeasPage() {
                                         </p>
                                     )
                                 ) : (
-                                    <div
+                                    <AllIdeasFolderChip
+                                        isSelected={selectedPillars.length === 0}
                                         onClick={() => setSelectedPillars([])}
-                                        className={`group relative flex items-center justify-center cursor-pointer transition-transform hover:-translate-y-1 h-10 px-5 rounded-t-xl rounded-br-xl ${selectedPillars.length === 0 ? 'bg-ink text-paper z-10' : 'bg-paper-sunken text-ink-muted'}`}
-                                        style={{ borderTopLeftRadius: '0.75rem' }}
-                                    >
-                                        <div className={`absolute -top-2.5 left-0 w-1/2 h-3.5 rounded-t-lg ${selectedPillars.length === 0 ? 'bg-ink' : 'bg-paper-sunken'}`}></div>
-                                        <span className="font-medium text-xs relative z-10">all ideas</span>
-                                    </div>
+                                    />
                                 )}
 
                                 {pillars.map(p => {
@@ -541,7 +538,7 @@ export default function IdeasPage() {
 
                                     if (isEditing) {
                                         return (
-                                            <div key={p.id} className="group relative flex items-center h-10 bg-paper-elevated border-2 border-[#125603] rounded-t-xl rounded-br-xl px-2 z-20">
+                                            <div key={p.id} className="group relative flex items-center h-12 bg-paper-elevated border-2 border-[#125603] rounded-md px-3 z-20">
                                                 <input
                                                     type="text"
                                                     value={editingPillarName}
@@ -559,53 +556,19 @@ export default function IdeasPage() {
                                     }
 
                                     return (
-                                        <div
+                                        <PillarFolderChip
                                             key={p.id}
+                                            name={p.name}
+                                            color={p.color}
+                                            isSelected={isSelected}
+                                            isSeries={p.is_series}
                                             onClick={() => togglePillar(p.id)}
-                                            style={{
-                                                backgroundColor: isSelected ? displayBg(p.color) : undefined,
-                                                color: isSelected ? getPairedTextColor(p.color) : undefined,
-                                                borderColor: !isSelected ? displayBg(p.color) : 'transparent',
+                                            onDelete={(e) => deletePillar(e, p.id)}
+                                            onRename={(e) => {
+                                                e.stopPropagation()
+                                                startEditingPillar(p.id, p.name)
                                             }}
-                                            className={`group relative flex items-center gap-2 h-10 px-4 cursor-pointer transition-transform hover:-translate-y-1 rounded-t-xl rounded-br-xl shadow-sm hover:shadow ${!isSelected ? 'bg-paper-elevated border-2 opacity-80 hover:opacity-100 text-ink-muted' : 'font-bold border border-black/10 z-10'}`}
-                                        >
-                                            <div
-                                                className="absolute -top-2.5 left-0 w-1/2 h-3.5 rounded-t-lg transition-colors"
-                                                style={{
-                                                    backgroundColor: displayBg(p.color),
-                                                    opacity: isSelected ? 1 : 0.4,
-                                                    borderTop: !isSelected ? `1px solid ${displayBg(p.color)}` : 'none',
-                                                    borderLeft: !isSelected ? `1px solid ${displayBg(p.color)}` : 'none',
-                                                    borderRight: !isSelected ? `1px solid ${displayBg(p.color)}` : 'none'
-                                                }}
-                                            ></div>
-
-                                            <span
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    startEditingPillar(p.id, p.name);
-                                                }}
-                                                className={`text-[11px] ${isSelected ? 'font-semibold' : 'font-medium'} hover:underline decoration-black/30 underline-offset-2 relative z-10`}
-                                                title="Click to rename"
-                                            >
-                                                {p.name}
-                                            </span>
-                                            {p.is_series && (
-                                                <span
-                                                    className={`text-[10px] font-semibold rounded-sm px-1 py-0.5 relative z-10 ${isSelected ? 'bg-black/10 text-black/70' : 'bg-paper-sunken text-ink-muted'}`}
-                                                    title="series pillar"
-                                                >
-                                                    series
-                                                </span>
-                                            )}
-                                            <button
-                                                onClick={(e) => deletePillar(e, p.id)}
-                                                className={`rounded-md p-1 transition-all opacity-0 group-hover:opacity-100 relative z-10 ${isSelected ? 'text-black/50 hover:bg-black/10' : 'text-ink-faint hover:text-red-500 hover:bg-paper-sunken'}`}
-                                                title="Delete pillar"
-                                            >
-                                                <X className="h-3.5 w-3.5 stroke-[3]" />
-                                            </button>
-                                        </div>
+                                        />
                                     )
                                 })}
                             </div>

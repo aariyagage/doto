@@ -12,6 +12,7 @@ import {
     Lightbulb,
     Sparkles,
     Inbox,
+    Layers,
     Mic,
     Menu,
     X,
@@ -29,9 +30,10 @@ interface NavItem {
 }
 
 // Order: dashboard, INBOX (new — gated), upload, library, ideas (legacy),
-// CONCEPTS (new — gated), voice. Inbox sits early because the daily
-// capture flow is meant to be a quick first stop. Concepts sits next to
-// ideas during the transition so dogfooders can hop between surfaces.
+// CONCEPTS (new — gated), WORKSPACE (new — gated), voice. Inbox sits
+// early because the daily capture flow is meant to be a quick first stop.
+// Concepts + Workspace cluster next to ideas during the transition so
+// dogfooders can hop between surfaces.
 const NAV_ITEMS: NavItem[] = [
     { label: 'dashboard', path: '/dashboard', Icon: LayoutGrid },
     { label: 'inbox', path: '/inbox', Icon: Inbox, flag: 'brainstormInbox' },
@@ -39,6 +41,7 @@ const NAV_ITEMS: NavItem[] = [
     { label: 'library', path: '/videos', Icon: FolderOpen },
     { label: 'ideas', path: '/ideas', Icon: Lightbulb },
     { label: 'concepts', path: '/concepts', Icon: Sparkles, flag: 'conceptPipeline' },
+    { label: 'workspace', path: '/workspace', Icon: Layers, flag: 'workspaceV1' },
     { label: 'voice', path: '/voice-profile', Icon: Mic },
 ]
 

@@ -53,7 +53,7 @@ Vercel: `main` stays Production. `vnext-workspace` is added as a tracked Preview
 | M2 | Concept pipeline backend (voice-isolated) | done | 3-pass pipeline + voice-leak regression test (12/12 green) |
 | M3 | Concept Library UI | done | first user-visible release; /concepts + /concepts/[id] |
 | M4 | Brainstorm Inbox | done | /inbox + brainstorm.ts + brainstorm API surface |
-| M5 | Pillar Workspace + DnD | pending | depends on M2 |
+| M5 | Pillar Workspace + DnD | done | /workspace + drag-drop + merge + split |
 | M6 | Research pass + multi-candidate ranking | pending | depends on M2 |
 | M7 | Auto-ideas dual-write cutover | pending | depends on M2 |
 | M8 | Hardening (rate limits, headers, E2E) | pending | depends on M3+M4+M5 |
@@ -71,6 +71,35 @@ Each milestone appends a section here when it lands. Format:
 > - any deviations from the plan
 
 (Sections appended below as milestones complete.)
+
+### M5 — Pillar Workspace + DnD (2026-05-03)
+
+- `src/app/workspace/page.tsx` — `/workspace` UI. Horizontally scrollable row of pillar columns (folder visual at the header using existing `displayBg` + `getPairedTextColor` helpers). Each column lists its active concepts (status in `draft`, `reviewed`, `saved`) sorted by composite score desc. Cards use `@dnd-kit/core` `useDraggable`; columns use `useDroppable`. Dropping a card on another column fires `PATCH /api/concepts/[id]` with the new `pillar_id` (optimistic update with revert-on-fail).
+- Pillar header actions: rename inline (Enter saves, Esc cancels, blur autosaves), merge dropdown (lists every other pillar; click target → confirm dialog → merge), and a column-level concept count.
+- Page-level **split mode** toggle: enter → cards become click-to-select with checkboxes; type a name; "split N" button creates a new pillar and moves selected concepts. All selected concepts must come from the same source pillar (validated client-side; server rejects cross-pillar mixes anyway via the explicit `pillar_id` filter).
+- `src/app/api/pillars/merge/route.ts` — `POST` body `{from_id, into_id}`. Five sequential ops:
+    1. Drop `video_pillars` rows that would collide with the target's existing rows on the unique `(video_id, pillar_id)` constraint.
+    2. Re-point remaining `video_pillars` to `into_id`.
+    3. Re-point `concepts.pillar_id` to `into_id`.
+    4. Re-point legacy `content_ideas.pillar_id` to `into_id` (so `/ideas` stays consistent).
+    5. Re-point `brainstorm_notes.pillar_id` to `into_id`.
+    6. Delete the source pillar.
+   Not transactional. If the API process dies mid-merge the data ends in a half-merged state; recovery is manual via Supabase Studio. Concept merges are user-initiated and rare so this is acceptable for v1; if it bites later, replace with a SECURITY INVOKER Postgres function.
+- `src/app/api/pillars/split/route.ts` — `POST` body `{pillar_id, concept_ids[], new_name, new_description?, color?}`. Creates a new pillar with HF embedding (non-fatal if HF cold-starts; pillar persists without embedding and tag-or-create still works), moves the requested concepts. Surfaces 409 on case-insensitive name conflicts via the existing `pillars_user_name_lower_uniq` index. Rolls back the new pillar if the concept move fails.
+- `src/components/AppLayout.tsx` — adds a `workspace` nav item between `concepts` and `voice`, gated on `featureFlags.workspaceV1()` (which transitively requires `conceptPipeline`).
+
+What's deliberately NOT in M5:
+
+- No transactional merge. Sequential ops are fine for solo creator usage.
+- No drag-and-drop reordering within a column. Sort is by composite score; the workspace is for cross-pillar moves, not within-pillar ranking.
+- No keyboard accessibility for drag (dnd-kit supports `useKeyboardSensor` but the activation requires more UI affordances; defer to M8 polish).
+- No pillar create from `/workspace`. Stays on `/ideas` until a future polish PR.
+- No undo on merge. Confirm dialog is the only safety net.
+
+Verification:
+
+- `npm test` → 12/12 (no new tests; merge/split + DnD lives in Playwright in M8).
+- `npx tsc --noEmit` → clean.
 
 ### M4 — Brainstorm Inbox (2026-05-03)
 

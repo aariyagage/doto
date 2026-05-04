@@ -52,7 +52,7 @@ Vercel: `main` stays Production. `vnext-workspace` is added as a tracked Preview
 | M1 | Schema (008–011) | done | additive migrations + schema-level verify script |
 | M2 | Concept pipeline backend (voice-isolated) | done | 3-pass pipeline + voice-leak regression test (12/12 green) |
 | M3 | Concept Library UI | done | first user-visible release; /concepts + /concepts/[id] |
-| M4 | Brainstorm Inbox | pending | depends on M2 |
+| M4 | Brainstorm Inbox | done | /inbox + brainstorm.ts + brainstorm API surface |
 | M5 | Pillar Workspace + DnD | pending | depends on M2 |
 | M6 | Research pass + multi-candidate ranking | pending | depends on M2 |
 | M7 | Auto-ideas dual-write cutover | pending | depends on M2 |
@@ -71,6 +71,32 @@ Each milestone appends a section here when it lands. Format:
 > - any deviations from the plan
 
 (Sections appended below as milestones complete.)
+
+### M4 — Brainstorm Inbox (2026-05-03)
+
+A capture surface for rough thoughts. Three operations: expand (Groq cleanup), cluster (pgvector greedy grouping at cosine ≥0.78, no model calls), and promote (PASS 1 only seeded by the note → draft concept).
+
+- `src/lib/concepts/brainstorm.ts` — `expandBrainstormNote`, `clusterInboxNotes`, `promoteBrainstormToDraftConcept`, `reembedBrainstormNote`. Voice-AGNOSTIC throughout. `<USER_NOTE>` fence + sanitization on the rough text before any LLM call. Cluster runs entirely in-app via cosine math; no Groq, no HF (embeddings already cached on note creation).
+- `src/lib/concepts/index.ts` — barrel re-exports the new helpers.
+- `src/app/api/brainstorm/route.ts` — GET list (default hides archived) + POST create. POST embeds via HF; if HF cold-starts and 503s, the note still inserts without an embedding (graceful degradation; cluster will skip it).
+- `src/app/api/brainstorm/[id]/route.ts` — PATCH edit/retag/status + DELETE. Re-embeds when raw_text changes; surfaces `reembed_failed` flag if HF was unavailable.
+- `src/app/api/brainstorm/[id]/expand/route.ts` — 1 Groq call. Updates `expanded_text`. Idempotent in spirit (re-running overwrites).
+- `src/app/api/brainstorm/cluster/route.ts` — 0 model calls. Greedy: walks notes in insertion order; first unclustered note seeds a cluster, pulls in everyone above 0.78. Singletons stay `inbox`. Re-runnable.
+- `src/app/api/brainstorm/[id]/promote/route.ts` — 1 Groq + 1 HF (PASS 1 with the note as seed). Inserts a draft concept, links via `source_brainstorm_id`, marks the note `converted` with `converted_concept_id`.
+- `src/app/inbox/page.tsx` — `/inbox` UI. Quick-capture textarea (Cmd/Ctrl+Enter to save, 2000 char cap with live counter). List grouped by `cluster_id` (clusters first with a "related" header, then unclustered notes). Per-note actions: sharpen (expand), pillar dropdown, "to concept" promote button (disabled until a pillar is picked), archive, delete. Bulk action: "group similar" runs the cluster RPC.
+- `src/components/AppLayout.tsx` — added `inbox` nav item between `dashboard` and `upload`. Gated on `featureFlags.brainstormInbox()` which transitively requires `conceptPipeline()`.
+
+What's deliberately NOT in M4:
+
+- No bulk expand. Each note expand is a separate Groq call to keep cost transparent.
+- No automatic re-cluster on every new note. The user clicks "group similar" when they want it; this avoids burning HF re-embeds on every keystroke.
+- No "promote without a pillar" path. Concept generation needs pillar context for PASS 1 — promoting from null pillar is rejected at the API layer.
+- No SSE / pass-progress streaming on promote. Same call-it-and-wait pattern as `/concepts/generate`.
+
+Verification:
+
+- `npm test` → 12/12 (no new tests; brainstorm cluster could use a unit test in M8 alongside the rest of the integration coverage).
+- `npx tsc --noEmit` → clean.
 
 ### M3 — Concept Library UI (2026-05-03)
 

@@ -48,3 +48,17 @@ export {
     buildStylistUserMessage,
 } from './prompts/stylist-prompt';
 export type { BuildStylistPromptArgs, StylistVoiceProfile } from './prompts/stylist-prompt';
+
+export {
+    expandBrainstormNote,
+    clusterInboxNotes,
+    promoteBrainstormToDraftConcept,
+    reembedBrainstormNote,
+    EXPAND_SYSTEM_MESSAGE,
+} from './brainstorm';
+export type {
+    ExpandResult,
+    ClusterResult,
+    PromoteArgs,
+    PromoteResult,
+} from './brainstorm';

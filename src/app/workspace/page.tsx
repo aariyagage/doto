@@ -28,14 +28,11 @@ import {
 import { CSS } from '@dnd-kit/utilities'
 import {
     Loader2,
-    Sparkles,
     Layers,
     Scissors,
-    Pencil,
     Check,
     X,
     GitMerge,
-    AlertCircle,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import AppLayout, { displayBg, getPairedTextColor } from '@/components/AppLayout'
@@ -439,7 +436,7 @@ export default function WorkspacePage() {
                         </div>
 
                         <DragOverlay>
-                            {activeConcept && <ConceptCardOverlay concept={activeConcept} pillarColor={pillars.find(p => p.id === activeConcept.pillar_id)?.color ?? null} />}
+                            {activeConcept && <ConceptCardOverlay concept={activeConcept} />}
                         </DragOverlay>
                     </DndContext>
                 )}
@@ -570,7 +567,6 @@ function PillarColumn({
                     <DraggableConceptCard
                         key={c.id}
                         concept={c}
-                        pillarColor={pillar.color}
                         splitMode={splitMode}
                         splitSelected={splitSelected.has(c.id)}
                         onToggleSplit={() => onToggleSplit(c.id)}
@@ -583,9 +579,11 @@ function PillarColumn({
 
 // ---- DraggableConceptCard -------------------------------------------------
 
+// pillarColor is currently unused (the card has no per-pillar tint —
+// the column header carries the color). Kept on the props so it can be
+// wired up later without re-threading data.
 interface DraggableConceptCardProps {
     concept: Concept
-    pillarColor: string | null
     splitMode: boolean
     splitSelected: boolean
     onToggleSplit: () => void
@@ -651,7 +649,7 @@ function DraggableConceptCard({
     )
 }
 
-function ConceptCardOverlay({ concept, pillarColor }: { concept: Concept; pillarColor: string | null }) {
+function ConceptCardOverlay({ concept }: { concept: Concept }) {
     const useVoice = Boolean(concept.voice_adapted_title)
     const displayTitle = useVoice && concept.voice_adapted_title ? concept.voice_adapted_title : concept.title
     return (

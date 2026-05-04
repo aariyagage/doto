@@ -57,7 +57,7 @@ Vercel: `main` stays Production. `vnext-workspace` is added as a tracked Preview
 | M6 | Research pass + multi-candidate ranking | done | research.ts + /api/research + auto-enrichment in generate |
 | M7 | Auto-ideas dual-write cutover | done | upload pipeline branches on CONCEPT_PIPELINE |
 | M8 | Hardening (rate limits, headers, regression tests) | done | DB Groq limiter + ASCII helper + 25 new tests (37 total) |
-| M9 | Prod cutover | pending | merge + flag flip |
+| M9 | Prod cutover | ready (user-driven) | merge + flag flip — see Cutover checklist |
 
 ## Per-milestone changelog
 
@@ -238,6 +238,14 @@ Verification:
 - `npm run build` → clean. New routes: `/concepts` (7.39 kB), `/concepts/[id]` (5.34 kB).
 - Manual smoke test: with `NEXT_PUBLIC_CONCEPT_PIPELINE` unset, the `concepts` nav item is hidden and direct visits to `/concepts` show the disabled-feature message. With it set to `true`, the page renders, generate is disabled until a pillar is picked, and all status transitions work.
 
+### M9 — Prod cutover (ready, awaiting user execution — 2026-05-03)
+
+vNext is in a merge-ready state. 13 commits on `vnext-workspace` (M0 + M1 schema + M2 backend + M3 UI + DefinePlugin fix + M4 inbox + M5 workspace + M6 research + M7 auto-topup + M8 hardening + 3 polish commits). 37/37 tests, typecheck clean, lint clean for vNext code.
+
+The actual cutover is user-driven (push, PR, merge, Vercel env flip, tag) — those are shared-state actions. The "Cutover checklist" section above has the exact commands.
+
+**Deviation from the plan:** the original plan called for an `ALLOWLIST_USER_IDS` server-side gate to enable vNext for one user before global flip. That requires either rendering AppLayout as a server component (against current architecture) or a cookie bridge — both add complexity for a solo creator. The recommended simpler path: flip the four `NEXT_PUBLIC_*` flags ON in Vercel Production at merge time; the flag mechanism is itself the rollback safety net. If anything regresses, flip the flags off and legacy `/ideas` resumes immediately. The `flagFor()` allowlist plumbing remains in `src/lib/env.ts` for future use if/when multi-user makes it useful.
+
 ### M2 — Concept pipeline backend, voice-isolated (2026-05-03)
 
 The load-bearing milestone. Voice profile is read in exactly one place in the new pipeline (`src/lib/concepts/stylist.ts`); the architectural-rule guardrail enforces it.
@@ -305,15 +313,120 @@ What's deliberately NOT in M2:
 
 ## Cutover checklist
 
-To run at M9, in order:
+vNext is ready to merge. 13 commits on `vnext-workspace`, 37/37 tests, typecheck clean. Schema migrations 008–011 are already applied to the (single) Supabase project. Legacy `/ideas` continues working unchanged — every new code path is gated behind `NEXT_PUBLIC_*` flags that default `false` in prod.
 
-1. Confirm vNext preview is green on its own DB tables (concepts, brainstorm_notes, concept_events, pipeline_runs all populated, RLS verified).
-2. Confirm prod `/ideas` and `/upload` flows still work unchanged on `main` (untouched by 008–011 migrations).
-3. Merge `vnext-workspace` → `main` via fast-forward.
-4. Allowlist `soohum@gptintegrators.com` only (hardcoded in `src/lib/env.ts`); flip `CONCEPT_PIPELINE`, `BRAINSTORM_INBOX`, `WORKSPACE_V1`, `RESEARCH_PASS` to `true` in Vercel Production env, but only for that user via the allowlist gate.
-5. 48h soak: monitor Groq/HF call counts in `pipeline_runs`, watch error logs, confirm no regression in legacy `/ideas` traffic.
-6. If clean: remove the allowlist gate, flag-flip global. Tag `v2.0-vnext-cutover`.
-7. If anything regresses: leave allowlist in place, debug, repeat.
+**Recommendation: skip the dark-launch allowlist for solo cutover.** The PRD plan called for an `ALLOWLIST_USER_IDS` gate so we could enable vNext for one user before everyone, but that requires either rendering the nav server-side (against current AppLayout architecture) or shipping a cookie-based bridge — both add complexity. Given the app currently has one creator (you), the simpler path is: flip the env flags ON at merge time, monitor, and if anything regresses turn the flags OFF (the new UI vanishes; legacy `/ideas` resumes serving). The flag mechanism IS the rollback safety net.
+
+### Pre-merge checks (already passing on `vnext-workspace`)
+
+- `npx tsc --noEmit` → clean
+- `npm test` → 37/37
+- `npm run lint` → only pre-existing legacy warnings; vNext code is clean
+- Working tree clean; all 13 vNext commits ahead of `main`
+
+### Steps you run
+
+```bash
+# 1. Push branches + tag (you haven't pushed yet)
+git push origin v1.0-prod-snapshot
+git push -u origin release/v1
+git push -u origin vnext-workspace
+
+# 2. Open the PR
+gh pr create --base main --head vnext-workspace \
+  --title "vNext: creator workspace (M0–M8)" \
+  --body-file - <<'EOF'
+## What this is
+
+vNext: evolution from transcript-and-voice-profile-driven idea generator
+into a creator workspace. The PRD's load-bearing rule — voice profile
+applies AFTER concept generation, not during — is enforced by an
+architectural-rule guardrail test (tests/prompts/voice-leak.test.ts).
+
+## What ships
+
+New surfaces (all gated by NEXT_PUBLIC_* flags; default false):
+
+  /concepts          3-pass concept library (CONCEPT_PIPELINE)
+  /concepts/[id]     concept detail with state machine
+  /inbox             brainstorm capture + AI sharpen + promote (BRAINSTORM_INBOX)
+  /workspace         drag/drop pillar reorganization (WORKSPACE_V1)
+
+New tables (additive migrations 008-011, already applied):
+
+  concepts           central workspace object with status state machine
+  brainstorm_notes   raw user thoughts
+  concept_events     append-only audit + quality outcomes
+  pipeline_runs      observability + per-user Groq quota source
+
+Three-pass pipeline:
+
+  PASS 1 concept-generator  voice-AGNOSTIC; pillar + essences only
+  PASS 2 validator          rubric + cosine dedup; voice-AGNOSTIC
+  PASS 3 stylist            voice applied here, top-K eager + lazy tail
+
+## What's preserved
+
+Legacy /ideas, /upload, /videos, /voice-profile work unchanged.
+Migrations are strictly additive; no existing column was altered.
+
+## Rollout
+
+Flags default false in prod. After merge, set in Vercel Production:
+
+  NEXT_PUBLIC_CONCEPT_PIPELINE=true
+  NEXT_PUBLIC_BRAINSTORM_INBOX=true
+  NEXT_PUBLIC_WORKSPACE_V1=true
+  NEXT_PUBLIC_RESEARCH_PASS=true
+
+Rollback: flip the flags off in Vercel; legacy UI resumes immediately.
+
+## Test plan
+
+- [ ] /concepts loads with empty state on fresh deploy
+- [ ] Generate produces 5 concepts in ~10-15s; top 3 voice-styled
+- [ ] /inbox capture + sharpen + promote round-trip works
+- [ ] /workspace drag concept between pillar columns persists
+- [ ] /workspace merge two pillars moves all dependents
+- [ ] /workspace split selects + creates new pillar
+- [ ] Legacy /ideas behavior unchanged
+- [ ] Per-user Groq quota 429s after 26 calls in 60s
+
+See docs/migration-vnext.md for the full milestone log.
+EOF
+
+# 3. After PR merges to main, tag the release
+git checkout main
+git pull
+git tag -a v2.0-vnext-cutover -m "vNext creator workspace cutover"
+git push origin v2.0-vnext-cutover
+```
+
+### Vercel env flip
+
+In Vercel Production env (after merge):
+
+```
+NEXT_PUBLIC_CONCEPT_PIPELINE=true
+NEXT_PUBLIC_BRAINSTORM_INBOX=true
+NEXT_PUBLIC_WORKSPACE_V1=true
+NEXT_PUBLIC_RESEARCH_PASS=true
+```
+
+Trigger a redeploy (Vercel does this automatically when env vars change on a Production deploy). Once the deploy is live, vNext UI appears on prod.
+
+### What to watch the first 48h
+
+- `pipeline_runs` rows accumulating with `status='succeeded'` and reasonable `groq_calls` totals.
+- `concept_events` rows for status transitions (use the `admin_pipeline_quality` view in `migrations/010_pipeline_runs.sql`).
+- No spike in `status='failed'` runs.
+- Vercel function logs clean for `/api/concepts/*`, `/api/brainstorm/*`, `/api/research`, `/api/pillars/{merge,split,[id]/concepts/topup}`.
+
+### If something breaks
+
+1. **Flag flip off** in Vercel Production env (set the four flags to `false`); redeploy. Legacy `/ideas` resumes for everyone. New tables stay populated but unused. **First-line rollback.**
+2. **Code revert** — if a bug reaches prod beyond what flags gate, `git revert` the offending commit on `main`; redeploy. **Second-line rollback.**
+3. **Full rescue** — if a deploy breaks prod entirely, in Vercel "Promote to Production" the last `main` deploy from before the vNext merge. `release/v1` is the secondary parachute (checkout, force-push to `main` if Vercel rollback fails). **Nuclear option.**
 
 ## Rollback procedure
 

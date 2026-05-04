@@ -415,8 +415,11 @@ export default function ConceptsPage() {
                             ))}
                         </div>
 
-                        {/* Concept grid. */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-20">
+                        {/* Concept grid. items-start so an expanded card
+                            doesn't stretch its sibling — CSS-grid default
+                            is align-items: stretch which made each row's
+                            cards match the tallest one's height. */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-20 items-start">
                             {isLoading && Array.from({ length: 4 }).map((_, i) => (
                                 <div key={`l-${i}`} className="h-72 rounded-2xl bg-paper-sunken animate-pulse" />
                             ))}
@@ -613,29 +616,45 @@ export default function ConceptsPage() {
                                                                 </p>
                                                             </div>
                                                         )}
-                                                        {concept.structure ? (
-                                                            <div>
-                                                                <span className={`text-[11px] font-semibold block mb-2 ${isDefault ? 'text-ink-faint' : ''}`} style={isDefault ? undefined : { color: inkFaint }}>
-                                                                    structure
-                                                                </span>
-                                                                <pre className={`text-xs leading-relaxed font-mono whitespace-pre-wrap ${isDefault ? 'text-ink-muted' : ''}`} style={isDefault ? undefined : { color: cardInk }}>
-                                                                    {JSON.stringify(concept.structure, null, 2)}
-                                                                </pre>
-                                                            </div>
-                                                        ) : null}
-                                                        {concept.score && (
-                                                            <div>
-                                                                <span className={`text-[11px] font-semibold block mb-2 ${isDefault ? 'text-ink-faint' : ''}`} style={isDefault ? undefined : { color: inkFaint }}>
-                                                                    scores
-                                                                </span>
-                                                                <div className={`text-xs space-y-1 ${isDefault ? 'text-ink-muted' : ''}`} style={isDefault ? undefined : { color: cardInk }}>
-                                                                    <div>novelty: {(concept.score.novelty ?? 0).toFixed(2)}</div>
-                                                                    <div>fit: {(concept.score.fit ?? 0).toFixed(2)}</div>
-                                                                    <div>specificity: {(concept.score.specificity ?? 0).toFixed(2)}</div>
-                                                                    <div className="font-semibold pt-1">composite: {(concept.score.composite ?? 0).toFixed(2)}</div>
+                                                        {concept.structure ? (() => {
+                                                            // PASS 1's structure jsonb is shaped {format, beats[]}.
+                                                            // Render that readably; fall back to a compact JSON
+                                                            // view only if the shape is unexpected.
+                                                            const s = concept.structure as { format?: unknown; beats?: unknown };
+                                                            const beats = Array.isArray(s.beats)
+                                                                ? (s.beats.filter(b => typeof b === 'string') as string[])
+                                                                : [];
+                                                            const format = typeof s.format === 'string' ? s.format : null;
+                                                            const knownShape = beats.length > 0 || format;
+                                                            return (
+                                                                <div>
+                                                                    <span className={`text-[11px] font-semibold block mb-2 ${isDefault ? 'text-ink-faint' : ''}`} style={isDefault ? undefined : { color: inkFaint }}>
+                                                                        how this video runs
+                                                                    </span>
+                                                                    {knownShape ? (
+                                                                        <div className={`text-sm space-y-2 ${isDefault ? 'text-ink' : ''}`} style={isDefault ? undefined : { color: cardInk }}>
+                                                                            {format && (
+                                                                                <p>
+                                                                                    <span className={isDefault ? 'text-ink-muted' : ''} style={isDefault ? undefined : { color: inkMuted }}>format · </span>
+                                                                                    {format}
+                                                                                </p>
+                                                                            )}
+                                                                            {beats.length > 0 && (
+                                                                                <ol className="space-y-1 list-decimal list-inside marker:text-current/60">
+                                                                                    {beats.map((b, i) => (
+                                                                                        <li key={i} className="leading-relaxed">{b}</li>
+                                                                                    ))}
+                                                                                </ol>
+                                                                            )}
+                                                                        </div>
+                                                                    ) : (
+                                                                        <pre className={`text-xs leading-relaxed font-mono whitespace-pre-wrap ${isDefault ? 'text-ink-muted' : ''}`} style={isDefault ? undefined : { color: cardInk }}>
+                                                                            {JSON.stringify(concept.structure, null, 2)}
+                                                                        </pre>
+                                                                    )}
                                                                 </div>
-                                                            </div>
-                                                        )}
+                                                            );
+                                                        })() : null}
                                                     </div>
                                                 )}
                                             </div>

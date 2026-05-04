@@ -587,8 +587,9 @@ export default function IdeasPage() {
                             ))}
                         </div>
 
-                        {/* Ideas List */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-20">
+                        {/* Ideas List. items-start so one expanded card doesn't
+                            stretch its row sibling (CSS-grid align-items default). */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-20 items-start">
                             {/* Loading State */}
                             {isLoading && (
                                 Array.from({ length: 4 }).map((_, i) => (

@@ -483,25 +483,42 @@ export default function ConceptDetailPage() {
                                 <p className="text-sm leading-relaxed text-ink-muted">{concept.research_summary}</p>
                             </div>
                         )}
-                        {concept.structure ? (
-                            <div>
-                                <span className="text-[11px] font-semibold block mb-2 text-ink-faint uppercase tracking-wide">structure</span>
-                                <pre className="text-xs leading-relaxed font-mono whitespace-pre-wrap text-ink-muted">
-                                    {JSON.stringify(concept.structure, null, 2)}
-                                </pre>
-                            </div>
-                        ) : null}
-                        {concept.score && (
-                            <div>
-                                <span className="text-[11px] font-semibold block mb-2 text-ink-faint uppercase tracking-wide">scores</span>
-                                <div className="text-xs space-y-1 text-ink-muted">
-                                    <div>novelty: {concept.score.novelty.toFixed(2)}</div>
-                                    <div>fit: {concept.score.fit.toFixed(2)}</div>
-                                    <div>specificity: {concept.score.specificity.toFixed(2)}</div>
-                                    <div className="font-semibold pt-1 text-ink">composite: {concept.score.composite.toFixed(2)}</div>
+                        {concept.structure ? (() => {
+                            // Render PASS 1's {format, beats[]} jsonb readably.
+                            // Fall back to compact JSON only for unexpected shapes.
+                            const s = concept.structure as { format?: unknown; beats?: unknown };
+                            const beats = Array.isArray(s.beats)
+                                ? (s.beats.filter(b => typeof b === 'string') as string[])
+                                : [];
+                            const format = typeof s.format === 'string' ? s.format : null;
+                            const knownShape = beats.length > 0 || format;
+                            return (
+                                <div>
+                                    <span className="text-[11px] font-semibold block mb-2 text-ink-faint uppercase tracking-wide">how this video runs</span>
+                                    {knownShape ? (
+                                        <div className="text-sm space-y-2 text-ink">
+                                            {format && (
+                                                <p>
+                                                    <span className="text-ink-muted">format · </span>
+                                                    {format}
+                                                </p>
+                                            )}
+                                            {beats.length > 0 && (
+                                                <ol className="space-y-1 list-decimal list-inside marker:text-ink-muted">
+                                                    {beats.map((b, i) => (
+                                                        <li key={i} className="leading-relaxed">{b}</li>
+                                                    ))}
+                                                </ol>
+                                            )}
+                                        </div>
+                                    ) : (
+                                        <pre className="text-xs leading-relaxed font-mono whitespace-pre-wrap text-ink-muted">
+                                            {JSON.stringify(concept.structure, null, 2)}
+                                        </pre>
+                                    )}
                                 </div>
-                            </div>
-                        )}
+                            );
+                        })() : null}
                     </div>
                 )}
 

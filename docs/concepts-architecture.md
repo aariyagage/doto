@@ -34,14 +34,58 @@ The legacy `content_ideas` table treats every generated idea as a final output: 
 
 ## Data model
 
-(Filled in by M1 once migrations 008–011 land. The table definitions in `migrations/008_concepts_workspace.sql` and `migrations/009_concept_events.sql` are the source of truth.)
+The migration files in `/migrations/008_concepts_workspace.sql`, `009_concept_events.sql`, `010_pipeline_runs.sql`, and `011_concept_rpcs.sql` are the source of truth. This section summarizes the shapes; column-level docs live in the SQL comments.
 
-Top-level tables:
+### `concepts`
 
-- `concepts` — the central workspace object.
-- `brainstorm_notes` — raw user-typed thoughts; can be promoted to concepts.
-- `concept_events` — append-only audit/quality log.
-- `pipeline_runs` — observability layer (see `docs/observability.md`).
+- `id` uuid PK
+- `user_id` uuid → `auth.users(id)` ON DELETE CASCADE
+- `pillar_id` uuid → `pillars(id)` ON DELETE SET NULL (nullable)
+- `title` text NOT NULL, `hook`, `angle`, `structure` (jsonb)
+- `research_summary`, `ai_reason`, `score` (jsonb: `{novelty, fit, specificity, composite}`)
+- `voice_adapted_title`, `voice_adapted_hook`, `voice_adapted_text` — populated by PASS 3 stylist; nullable until styled
+- `status` text — see [state machine](#status-state-machine), default `draft`
+- `source_kind` text — see [source kinds](#source-kinds)
+- `source_brainstorm_id` / `source_transcript_id` / `source_trend_hashtag` / `source_trend_reddit_post` / `source_content_idea_id` — provenance pointers; one of these is meaningful per `source_kind`
+- `concept_embedding` vector(384) — `sentence-transformers/all-MiniLM-L6-v2`
+- `pipeline_run_id` uuid → `pipeline_runs(id)` ON DELETE SET NULL
+- `created_at`, `updated_at`, `reviewed_at`, `saved_at`, `used_at`
+
+Indexes: `(user_id, status)`, `(user_id, pillar_id, status) WHERE pillar_id IS NOT NULL`, `(pipeline_run_id)`, `(source_content_idea_id)`, IVFFlat on `concept_embedding` (lists=100, vector_cosine_ops).
+
+### `brainstorm_notes`
+
+- `id`, `user_id` (CASCADE)
+- `raw_text` text NOT NULL (cap 2000 chars at API boundary)
+- `expanded_text` text (Groq-cleaned version after `/api/brainstorm/[id]/expand`)
+- `cluster_id` uuid (soft cluster grouping; nullable until `/api/brainstorm/cluster` runs)
+- `pillar_id` uuid → `pillars(id)` ON DELETE SET NULL
+- `note_embedding` vector(384)
+- `status` text — `inbox` / `clustered` / `converted` / `archived`
+- `converted_concept_id` uuid → `concepts(id)` ON DELETE SET NULL
+- `created_at`, `updated_at`
+
+Indexes: `(user_id, status, created_at desc)`, `(user_id, cluster_id) WHERE cluster_id IS NOT NULL`, IVFFlat on `note_embedding`.
+
+### `concept_events`
+
+- `id` BIGSERIAL PK (write-heavy; ordered insertion preferred over UUID)
+- `user_id`, `concept_id` (both CASCADE on parent delete)
+- `event_type` text — see [event types](#event-types)
+- `from_status`, `to_status`, `metadata` (jsonb)
+- `created_at`
+
+Indexes: `(user_id, created_at desc)`, `(concept_id, created_at desc)`, `(user_id, event_type, created_at desc)`.
+
+**Append-only:** RLS has SELECT and INSERT policies only. No UPDATE or DELETE. Removal is via `ON DELETE CASCADE` from the parent concept.
+
+### `pipeline_runs`
+
+See `docs/observability.md` for the full schema and field semantics.
+
+### Event types
+
+Allowed values for `concept_events.event_type`: `created`, `validated`, `styled`, `reviewed`, `saved`, `used`, `rejected`, `archived`, `edited`, `refined`.
 
 ## Status state machine
 

@@ -49,7 +49,7 @@ Vercel: `main` stays Production. `vnext-workspace` is added as a tracked Preview
 | # | Milestone | Status | Notes |
 |---|---|---|---|
 | M0 | Branch + tooling | in progress | tag, branches, deps, vitest, doc skeletons |
-| M1 | Schema (008–011) | pending | additive migrations + RLS tests |
+| M1 | Schema (008–011) | done | additive migrations + schema-level verify script |
 | M2 | Concept pipeline backend (voice-isolated) | pending | the load-bearing voice fix |
 | M3 | Concept Library UI | pending | first user-visible release |
 | M4 | Brainstorm Inbox | pending | depends on M2 |
@@ -72,7 +72,19 @@ Each milestone appends a section here when it lands. Format:
 
 (Sections appended below as milestones complete.)
 
-### M0 — Branch + tooling (in progress)
+### M1 — Schema (2026-05-03)
+
+- `migrations/008_concepts_workspace.sql` — `concepts` and `brainstorm_notes` tables with `vector(384)` embeddings, IVFFlat indexes, owner-only RLS on all four verbs, status + source_kind CHECK constraints, circular FK closed at end of file.
+- `migrations/009_concept_events.sql` — `concept_events` append-only audit log; only SELECT and INSERT policies (no UPDATE/DELETE — events are immutable; cascade-delete with parent concept).
+- `migrations/010_pipeline_runs.sql` — `pipeline_runs` observability table + `concepts.pipeline_run_id` FK closed back-reference + `admin_pipeline_quality` view for save/reject/edit-rate metrics per run.
+- `migrations/011_concept_rpcs.sql` — `match_concepts_by_embedding(uid, q, threshold, limit, statuses?)` and `match_brainstorm_by_embedding(uid, q, threshold, limit, statuses?)` RPCs. Both filter by `p_user_id` server-side.
+- `scripts/verify-vnext-rls.sql` — schema-level verification (tables, policies, FKs, IVFFlat indexes, RPCs, view). Run in Supabase SQL editor after applying 008-011.
+
+**Cross-user RLS at runtime is deferred to M8** — a SQL-only test cannot simulate two authenticated users (Studio runs as `postgres` which bypasses RLS). The Vitest two-user fixture lands in M8 hardening.
+
+**To apply:** open Supabase SQL editor on the prod project, paste 008 → 009 → 010 → 011 in order and run each. Migrations are idempotent (`IF NOT EXISTS`, `DROP CONSTRAINT IF EXISTS`) so re-running is safe. New tables sit empty; legacy `/ideas` flow is unaffected.
+
+### M0 — Branch + tooling (2026-05-03)
 
 - Tagged `v1.0-prod-snapshot` at pre-vNext `main` HEAD (annotated tag, local only until pushed).
 - Created `release/v1` (frozen) and `vnext-workspace` (active) branches from `main`.

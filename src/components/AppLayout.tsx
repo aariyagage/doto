@@ -10,19 +10,32 @@ import {
     UploadCloud,
     FolderOpen,
     Lightbulb,
+    Sparkles,
     Mic,
     Menu,
     X,
 } from 'lucide-react'
+import { featureFlags } from '@/lib/env'
 
 // Re-export for backwards compatibility with existing imports
 export { PILLAR_COLORS, getPairedTextColor, displayBg } from '@/lib/colors'
 
-const NAV_ITEMS = [
+interface NavItem {
+    label: string
+    path: string
+    Icon: typeof LayoutGrid
+    flag?: 'conceptPipeline' | 'brainstormInbox' | 'workspaceV1'
+}
+
+// Order: dashboard, upload, library, ideas (legacy), CONCEPTS (new — gated),
+// voice. Concepts sits between ideas and voice during the transition so
+// dogfooders can hop between the two surfaces without losing their place.
+const NAV_ITEMS: NavItem[] = [
     { label: 'dashboard', path: '/dashboard', Icon: LayoutGrid },
     { label: 'upload', path: '/upload', Icon: UploadCloud },
     { label: 'library', path: '/videos', Icon: FolderOpen },
     { label: 'ideas', path: '/ideas', Icon: Lightbulb },
+    { label: 'concepts', path: '/concepts', Icon: Sparkles, flag: 'conceptPipeline' },
     { label: 'voice', path: '/voice-profile', Icon: Mic },
 ]
 
@@ -59,7 +72,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
     const NavList = ({ onNavigate }: { onNavigate?: () => void }) => (
         <nav className="flex flex-col gap-1 px-3">
-            {NAV_ITEMS.map(({ label, path, Icon }) => {
+            {NAV_ITEMS.map(({ label, path, Icon, flag }) => {
+                if (flag && !featureFlags[flag]()) return null
                 const isActive = pathname === path || pathname.startsWith(path + '/')
                 return (
                     <Link

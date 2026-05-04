@@ -30,8 +30,17 @@ export function requireEnv(key: RequiredEnv): string {
 // are enforced inside the helpers so callers can't accidentally enable a
 // dependent flag without its prerequisite.
 //
-// vNext preview env should set: CONCEPT_PIPELINE=true BRAINSTORM_INBOX=true
-//                               WORKSPACE_V1=true RESEARCH_PASS=true
+// All vNext flags are NEXT_PUBLIC_* so client components can gate UI
+// (nav items, page mounts) without round-tripping to a server endpoint.
+// These flags are toggles, not secrets; exposing them in the browser
+// bundle is safe.
+//
+// vNext preview env should set:
+//   NEXT_PUBLIC_CONCEPT_PIPELINE=true
+//   NEXT_PUBLIC_BRAINSTORM_INBOX=true
+//   NEXT_PUBLIC_WORKSPACE_V1=true
+//   NEXT_PUBLIC_RESEARCH_PASS=true
+//
 // Prod env keeps all of these unset (false) until the M9 cutover.
 //
 // See docs/feature-flags.md for the full matrix and dark-launch process.
@@ -41,11 +50,11 @@ function envFlag(name: string): boolean {
 }
 
 export const featureFlags = {
-    conceptPipeline: () => envFlag('CONCEPT_PIPELINE'),
-    brainstormInbox: () => envFlag('BRAINSTORM_INBOX') && featureFlags.conceptPipeline(),
-    workspaceV1:    () => envFlag('WORKSPACE_V1')     && featureFlags.conceptPipeline(),
-    researchPass:   () => envFlag('RESEARCH_PASS'),
-    scriptRefiner:  () => envFlag('SCRIPT_REFINER')   && featureFlags.conceptPipeline(),
+    conceptPipeline: () => envFlag('NEXT_PUBLIC_CONCEPT_PIPELINE'),
+    brainstormInbox: () => envFlag('NEXT_PUBLIC_BRAINSTORM_INBOX') && featureFlags.conceptPipeline(),
+    workspaceV1:    () => envFlag('NEXT_PUBLIC_WORKSPACE_V1')     && featureFlags.conceptPipeline(),
+    researchPass:   () => envFlag('NEXT_PUBLIC_RESEARCH_PASS'),
+    scriptRefiner:  () => envFlag('NEXT_PUBLIC_SCRIPT_REFINER')   && featureFlags.conceptPipeline(),
 };
 
 // Per-user allowlist for M9 dark-launch (48h soak before flipping flags

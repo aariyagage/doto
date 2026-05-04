@@ -26,11 +26,11 @@ The plan uses **env-var-only flags** (no `feature_flag_overrides` table) for v1 
 
 | Flag | vNext preview default | Prod default | Gates |
 |---|---|---|---|
-| `CONCEPT_PIPELINE` | `true` | `false` | `/concepts` UI, `/api/concepts/*`, `/api/concepts/import-legacy`. When `true`, post-essence auto-ideas writes to `concepts` instead of `content_ideas`. |
-| `BRAINSTORM_INBOX` | `true` | `false` | `/inbox` UI, `/api/brainstorm/*`, brainstorm nav link. |
-| `WORKSPACE_V1` | `true` | `false` | `/workspace` UI, drag/drop, `/api/pillars/merge`, `/api/pillars/split`, workspace nav link. |
-| `RESEARCH_PASS` | `true` | `false` | `/api/research`, research-summary input to PASS 1 user message. |
-| `SCRIPT_REFINER` | `false` | `false` | Phase 4 only. `/api/concepts/[id]/refine`, refine UI on concept detail page. |
+| `NEXT_PUBLIC_CONCEPT_PIPELINE` | `true` | `false` | `/concepts` UI, `/api/concepts/*`, `/api/concepts/import-legacy`. When `true`, post-essence auto-ideas writes to `concepts` instead of `content_ideas`. |
+| `NEXT_PUBLIC_BRAINSTORM_INBOX` | `true` | `false` | `/inbox` UI, `/api/brainstorm/*`, brainstorm nav link. |
+| `NEXT_PUBLIC_WORKSPACE_V1` | `true` | `false` | `/workspace` UI, drag/drop, `/api/pillars/merge`, `/api/pillars/split`, workspace nav link. |
+| `NEXT_PUBLIC_RESEARCH_PASS` | `true` | `false` | `/api/research`, research-summary input to PASS 1 user message. |
+| `NEXT_PUBLIC_SCRIPT_REFINER` | `false` | `false` | Phase 4 only. `/api/concepts/[id]/refine`, refine UI on concept detail page. |
 
 Existing flags (untouched, listed for reference):
 
@@ -39,10 +39,10 @@ Existing flags (untouched, listed for reference):
 
 ## Layering rules
 
-- `BRAINSTORM_INBOX` requires `CONCEPT_PIPELINE` (promote-to-concept needs concepts).
-- `WORKSPACE_V1` requires `CONCEPT_PIPELINE` (workspace surfaces concepts).
-- `SCRIPT_REFINER` requires `CONCEPT_PIPELINE` (refines a concept).
-- `RESEARCH_PASS` is independent — concept generator runs without it (skips research summary input to PASS 1).
+- `NEXT_PUBLIC_BRAINSTORM_INBOX` requires `NEXT_PUBLIC_CONCEPT_PIPELINE` (promote-to-concept needs concepts).
+- `NEXT_PUBLIC_WORKSPACE_V1` requires `NEXT_PUBLIC_CONCEPT_PIPELINE` (workspace surfaces concepts).
+- `NEXT_PUBLIC_SCRIPT_REFINER` requires `NEXT_PUBLIC_CONCEPT_PIPELINE` (refines a concept).
+- `NEXT_PUBLIC_RESEARCH_PASS` is independent — concept generator runs without it (skips research summary input to PASS 1).
 
 API and UI gates **must check both** their own flag and the prerequisite. If `BRAINSTORM_INBOX=true` but `CONCEPT_PIPELINE=false`, brainstorm routes return 503 (or the page 404s) and log a config-error.
 

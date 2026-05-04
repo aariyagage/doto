@@ -51,7 +51,7 @@ Vercel: `main` stays Production. `vnext-workspace` is added as a tracked Preview
 | M0 | Branch + tooling | in progress | tag, branches, deps, vitest, doc skeletons |
 | M1 | Schema (008–011) | done | additive migrations + schema-level verify script |
 | M2 | Concept pipeline backend (voice-isolated) | done | 3-pass pipeline + voice-leak regression test (12/12 green) |
-| M3 | Concept Library UI | pending | first user-visible release |
+| M3 | Concept Library UI | done | first user-visible release; /concepts + /concepts/[id] |
 | M4 | Brainstorm Inbox | pending | depends on M2 |
 | M5 | Pillar Workspace + DnD | pending | depends on M2 |
 | M6 | Research pass + multi-candidate ranking | pending | depends on M2 |
@@ -71,6 +71,29 @@ Each milestone appends a section here when it lands. Format:
 > - any deviations from the plan
 
 (Sections appended below as milestones complete.)
+
+### M3 — Concept Library UI (2026-05-03)
+
+The first user-visible vNext release.
+
+- `src/app/concepts/page.tsx` — `/concepts` library. Pillar chip filter (single-select for the generate flow), 4 status tabs (All / Saved / Used / Archive), 2-col card grid, optimistic save/used/reject/archive transitions, lazy-stylist trigger button on unstyled cards, score badge (composite %) with hover tooltip showing novelty/fit/specificity, empty-state CTA to import legacy v2 saved ideas. Voice-adapted toggle in the top bar swaps between original PASS 1 output and PASS 3 styled output for cards that have both.
+- `src/app/concepts/[id]/page.tsx` — concept detail. Edit-in-place title (Enter to save, Esc to cancel) and hook (Cmd/Ctrl+Enter to save). Side-by-side display of original vs voice-adapted text. Score breakdown, angle, ai_reason, structure, research_summary all rendered when present. Status menu shows only the legal next-states from the state machine. Events timeline reads `concept_events` and renders chronologically.
+- `src/components/AppLayout.tsx` — added `concepts` nav item between `ideas` and `voice`. Gated on `featureFlags.conceptPipeline()` so it only appears when `NEXT_PUBLIC_CONCEPT_PIPELINE=true`.
+- `src/lib/env.ts` — flags renamed to `NEXT_PUBLIC_*` so client components can gate UI without a server round-trip. `docs/feature-flags.md` updated to match. The flags aren't secrets, so exposing them in the browser bundle is fine.
+
+What's deliberately NOT in M3 yet:
+
+- No SSE / polling for pipeline pass progress. Generation shows a generic spinner skeleton; observers can watch `pipeline_runs` rows directly. Real-time UI is M3 polish or M8.
+- No multi-pillar batch generate. The endpoint takes a single `pillar_id`; the UI requires single-select. Multi-pillar would 3x Groq cost per click; defer.
+- No regenerate-single-concept button on cards (legacy `/ideas` has it). Defer to M8 polish.
+- Pillar create/rename/delete still happens on `/ideas`. M5 workspace will move it.
+
+Verification:
+
+- `npm test` → 12/12 green (no new tests added in M3; UI tests are M8).
+- `npx tsc --noEmit` → clean.
+- `npm run build` → clean. New routes: `/concepts` (7.39 kB), `/concepts/[id]` (5.34 kB).
+- Manual smoke test: with `NEXT_PUBLIC_CONCEPT_PIPELINE` unset, the `concepts` nav item is hidden and direct visits to `/concepts` show the disabled-feature message. With it set to `true`, the page renders, generate is disabled until a pillar is picked, and all status transitions work.
 
 ### M2 — Concept pipeline backend, voice-isolated (2026-05-03)
 

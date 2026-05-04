@@ -3,7 +3,7 @@ import { writeFile, unlink, stat, readdir } from 'fs/promises';
 import { extname, join } from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import { createClient } from '@/lib/supabase/server';
-import { requireEnv } from '@/lib/env';
+import { requireEnv, featureFlags } from '@/lib/env';
 import { rateLimit, RATE_LIMITS } from '@/lib/rate-limit';
 import os from 'os';
 import fs from 'fs';
@@ -15,6 +15,7 @@ import { tagOrCreatePillarsForVideo } from '@/lib/pillars/tag-or-create';
 import { detectAndPersistSeriesIfApplicable } from '@/lib/pillars/series-detector';
 import { regenerateVoiceProfileForUser } from '@/lib/pillars/voice-profile';
 import { topUpIdeasForPillars } from '@/lib/pillars/auto-ideas';
+import { topUpConceptsForPillars } from '@/lib/concepts';
 
 ffmpeg.setFfmpegPath(ffmpegInstaller.path);
 
@@ -369,10 +370,23 @@ export async function POST(request: Request) {
                                 .eq('video_id', videoId);
                             const taggedPillarIds = (tagged || []).map(t => t.pillar_id as string).filter(Boolean);
                             if (taggedPillarIds.length > 0) {
-                                const result = await topUpIdeasForPillars({
-                                    supabase, groq, userId: user.id, pillarIds: taggedPillarIds,
-                                });
-                                console.log(`auto-ideas video=${videoId} pillars=${taggedPillarIds.length} generated=${result.generated} toppedUp=${result.pillarsToppedUp}`);
+                                // Branch on the concept-pipeline flag. When on, post-essence
+                                // top-up writes to the concepts table via the 3-pass pipeline
+                                // (PASS 1 + PASS 2; lazy styling). When off, the legacy
+                                // content_ideas top-up runs unchanged so existing /ideas
+                                // users see no regression. Only one of the two paths runs
+                                // per upload.
+                                if (featureFlags.conceptPipeline()) {
+                                    const result = await topUpConceptsForPillars({
+                                        supabase, userId: user.id, pillarIds: taggedPillarIds,
+                                    });
+                                    console.log(`auto-concepts video=${videoId} pillars=${taggedPillarIds.length} generated=${result.generated} toppedUp=${result.pillarsToppedUp}`);
+                                } else {
+                                    const result = await topUpIdeasForPillars({
+                                        supabase, groq, userId: user.id, pillarIds: taggedPillarIds,
+                                    });
+                                    console.log(`auto-ideas video=${videoId} pillars=${taggedPillarIds.length} generated=${result.generated} toppedUp=${result.pillarsToppedUp}`);
+                                }
                             }
                         } catch (ideasErr) {
                             console.error('Auto idea top-up failed (non-fatal):', ideasErr);

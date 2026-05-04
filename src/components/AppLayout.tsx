@@ -10,19 +10,38 @@ import {
     UploadCloud,
     FolderOpen,
     Lightbulb,
+    Sparkles,
+    Inbox,
+    Layers,
     Mic,
     Menu,
     X,
 } from 'lucide-react'
+import { featureFlags } from '@/lib/env'
 
 // Re-export for backwards compatibility with existing imports
 export { PILLAR_COLORS, getPairedTextColor, displayBg } from '@/lib/colors'
 
-const NAV_ITEMS = [
+interface NavItem {
+    label: string
+    path: string
+    Icon: typeof LayoutGrid
+    flag?: 'conceptPipeline' | 'brainstormInbox' | 'workspaceV1'
+}
+
+// Order: dashboard, INBOX (new — gated), upload, library, ideas (legacy),
+// CONCEPTS (new — gated), WORKSPACE (new — gated), voice. Inbox sits
+// early because the daily capture flow is meant to be a quick first stop.
+// Concepts + Workspace cluster next to ideas during the transition so
+// dogfooders can hop between surfaces.
+const NAV_ITEMS: NavItem[] = [
     { label: 'dashboard', path: '/dashboard', Icon: LayoutGrid },
+    { label: 'inbox', path: '/inbox', Icon: Inbox, flag: 'brainstormInbox' },
     { label: 'upload', path: '/upload', Icon: UploadCloud },
     { label: 'library', path: '/videos', Icon: FolderOpen },
     { label: 'ideas', path: '/ideas', Icon: Lightbulb },
+    { label: 'concepts', path: '/concepts', Icon: Sparkles, flag: 'conceptPipeline' },
+    { label: 'workspace', path: '/workspace', Icon: Layers, flag: 'workspaceV1' },
     { label: 'voice', path: '/voice-profile', Icon: Mic },
 ]
 
@@ -59,7 +78,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
     const NavList = ({ onNavigate }: { onNavigate?: () => void }) => (
         <nav className="flex flex-col gap-1 px-3">
-            {NAV_ITEMS.map(({ label, path, Icon }) => {
+            {NAV_ITEMS.map(({ label, path, Icon, flag }) => {
+                if (flag && !featureFlags[flag]()) return null
                 const isActive = pathname === path || pathname.startsWith(path + '/')
                 return (
                     <Link

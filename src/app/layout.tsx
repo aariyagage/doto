@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
+import { Analytics } from "@vercel/analytics/react";
 import "./globals.css";
 import { ToastProvider } from "@/components/toast";
 import { UploadProvider } from "@/components/upload-context";
@@ -32,6 +33,10 @@ export default function RootLayout({
             {children}
           </UploadProvider>
         </ToastProvider>
+        {/* Vercel Web Analytics. No-op until enabled in the project's
+            Vercel dashboard (Settings → Analytics → Enable). Free Hobby
+            tier covers 2.5k events/month, which is plenty for solo use. */}
+        <Analytics />
       </body>
     </html>
   );

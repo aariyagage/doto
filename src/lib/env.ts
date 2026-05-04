@@ -45,16 +45,25 @@ export function requireEnv(key: RequiredEnv): string {
 //
 // See docs/feature-flags.md for the full matrix and dark-launch process.
 
-function envFlag(name: string): boolean {
-    return process.env[name] === 'true';
-}
+// IMPORTANT: every flag here uses a LITERAL `process.env.NEXT_PUBLIC_*`
+// access. Don't refactor through a helper that takes the name as a string
+// parameter — webpack's DefinePlugin can only inline literal property
+// accesses, and `process.env[name]` becomes `undefined` in the client
+// bundle (process.env doesn't exist in the browser; only inlined statics
+// survive). Asking once, paying forever.
 
 export const featureFlags = {
-    conceptPipeline: () => envFlag('NEXT_PUBLIC_CONCEPT_PIPELINE'),
-    brainstormInbox: () => envFlag('NEXT_PUBLIC_BRAINSTORM_INBOX') && featureFlags.conceptPipeline(),
-    workspaceV1:    () => envFlag('NEXT_PUBLIC_WORKSPACE_V1')     && featureFlags.conceptPipeline(),
-    researchPass:   () => envFlag('NEXT_PUBLIC_RESEARCH_PASS'),
-    scriptRefiner:  () => envFlag('NEXT_PUBLIC_SCRIPT_REFINER')   && featureFlags.conceptPipeline(),
+    conceptPipeline: () => process.env.NEXT_PUBLIC_CONCEPT_PIPELINE === 'true',
+    brainstormInbox: () =>
+        process.env.NEXT_PUBLIC_BRAINSTORM_INBOX === 'true' &&
+        featureFlags.conceptPipeline(),
+    workspaceV1: () =>
+        process.env.NEXT_PUBLIC_WORKSPACE_V1 === 'true' &&
+        featureFlags.conceptPipeline(),
+    researchPass: () => process.env.NEXT_PUBLIC_RESEARCH_PASS === 'true',
+    scriptRefiner: () =>
+        process.env.NEXT_PUBLIC_SCRIPT_REFINER === 'true' &&
+        featureFlags.conceptPipeline(),
 };
 
 // Per-user allowlist for M9 dark-launch (48h soak before flipping flags

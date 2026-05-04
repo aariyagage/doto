@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { Bookmark, Trash2, ChevronDown, ChevronUp, Loader2, Sparkles, Check, RefreshCw, X, Star } from 'lucide-react'
+import { motion, AnimatePresence } from 'framer-motion'
+import { Trash2, ChevronDown, ChevronUp, Loader2, Sparkles, Check, RefreshCw, Star } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import AppLayout, { displayBg, getPairedTextColor } from '@/components/AppLayout'
 import PillarFolderChip, { AllIdeasFolderChip } from '@/components/PillarFolderChip'
@@ -587,36 +588,43 @@ export default function IdeasPage() {
                             ))}
                         </div>
 
-                        {/* Ideas List. items-start so one expanded card doesn't
-                            stretch its row sibling (CSS-grid align-items default). */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-20 items-start">
+                        {/* Empty state — full-width, lives outside the
+                            masonry container so it isn't constrained to a
+                            single column. */}
+                        {!isLoading && filteredIdeas.length === 0 && !isGenerating && (
+                            <div className="flex flex-col items-center justify-center py-24 text-center">
+                                <div className="bg-paper-sunken p-4 rounded-full mb-4 flex items-center justify-center">
+                                    <Sparkles className="h-12 w-12 text-ink-faint" />
+                                </div>
+                                <h3 className="text-title-3 text-ink mb-2">no ideas yet</h3>
+                                <p className="text-body-sm text-ink-muted mb-6 max-w-sm">
+                                    generate your first batch of personalized content ideas tailored strictly to your voice profile.
+                                </p>
+                                <Button onClick={generateBatch} className="bg-ink text-paper hover:bg-ink/90 rounded-full px-6 transition-colors">
+                                    ✦ generate ideas
+                                </Button>
+                            </div>
+                        )}
+
+                        {/* Ideas masonry. CSS multi-column layout instead
+                            of grid: when a card expands, the other column
+                            packs tight with no whitespace beside it. Each
+                            card is a motion.div with layout so reflows
+                            animate smoothly. break-inside-avoid keeps a
+                            card from being split across columns. */}
+                        <div className="columns-1 md:columns-2 gap-6 pb-20">
                             {/* Loading State */}
                             {isLoading && (
                                 Array.from({ length: 4 }).map((_, i) => (
-                                    <div key={`loading-${i}`} className="h-64 rounded-2xl bg-paper-sunken animate-pulse w-full"></div>
+                                    <div key={`loading-${i}`} className="h-64 rounded-2xl bg-paper-sunken animate-pulse mb-6 break-inside-avoid"></div>
                                 ))
                             )}
 
                             {/* Batch Generating State Skeleton */}
                             {isGenerating && (
                                 Array.from({ length: 3 }).map((_, i) => (
-                                    <div key={`gen-${i}`} className="h-64 rounded-2xl bg-paper-sunken animate-pulse w-full"></div>
+                                    <div key={`gen-${i}`} className="h-64 rounded-2xl bg-paper-sunken animate-pulse mb-6 break-inside-avoid"></div>
                                 ))
-                            )}
-
-                            {!isLoading && filteredIdeas.length === 0 && !isGenerating && (
-                                <div className="flex flex-col items-center justify-center py-24 text-center">
-                                    <div className="bg-paper-sunken p-4 rounded-full mb-4 flex items-center justify-center">
-                                        <Sparkles className="h-12 w-12 text-ink-faint" />
-                                    </div>
-                                    <h3 className="text-title-3 text-ink mb-2">no ideas yet</h3>
-                                    <p className="text-body-sm text-ink-muted mb-6 max-w-sm">
-                                        generate your first batch of personalized content ideas tailored strictly to your voice profile.
-                                    </p>
-                                    <Button onClick={generateBatch} className="bg-ink text-paper hover:bg-ink/90 rounded-full px-6 transition-colors">
-                                        ✦ generate ideas
-                                    </Button>
-                                </div>
                             )}
 
                             {/* Render Ideas */}
@@ -632,9 +640,11 @@ export default function IdeasPage() {
                                 const inkSubtle = cardInk ? `color-mix(in srgb, ${cardInk} 25%, transparent)` : ''
 
                                 return (
-                                    <div
+                                    <motion.div
                                         key={idea.id}
-                                        className={`relative flex flex-col rounded-3xl border ${isDefault ? 'border-rule bg-paper-elevated' : 'border-transparent'} p-6 shadow-sm transition-opacity duration-300 ${idea.is_used ? 'opacity-50' : 'opacity-100'} overflow-hidden`}
+                                        layout="position"
+                                        transition={{ type: 'spring', stiffness: 320, damping: 30 }}
+                                        className={`relative flex flex-col rounded-3xl border ${isDefault ? 'border-rule bg-paper-elevated' : 'border-transparent'} p-6 shadow-sm transition-opacity duration-300 ${idea.is_used ? 'opacity-50' : 'opacity-100'} overflow-hidden mb-6 break-inside-avoid`}
                                         style={{ backgroundColor: isDefault ? undefined : comboColorBg, color: isDefault ? undefined : cardInk }}
                                     >
                                         {!isDefault && (
@@ -671,7 +681,7 @@ export default function IdeasPage() {
 
                                             {/* Title */}
                                             <h2
-                                                className={`text-xl md:text-2xl font-semibold tracking-tight leading-tight mb-5 ${isDefault ? 'text-ink' : ''}`}
+                                                className={`text-xl md:text-2xl font-semibold tracking-tight leading-tight mb-5 line-clamp-2 ${isDefault ? 'text-ink' : ''}`}
                                                 style={isDefault ? undefined : { color: cardInk }}
                                             >
                                                 {idea.title}
@@ -710,11 +720,18 @@ export default function IdeasPage() {
                                                     )}
                                                 </button>
 
+                                                <AnimatePresence initial={false}>
                                                 {idea.isExpanded && (
-                                                    <div
-                                                        className={`mt-5 space-y-5 rounded-2xl p-5 md:p-6 animate-in slide-in-from-top-2 fade-in duration-200 ${isDefault ? 'bg-paper-sunken' : ''}`}
+                                                    <motion.div
+                                                        key="expand"
+                                                        initial={{ height: 0, opacity: 0 }}
+                                                        animate={{ height: 'auto', opacity: 1 }}
+                                                        exit={{ height: 0, opacity: 0 }}
+                                                        transition={{ duration: 0.25, ease: [0.32, 0.72, 0, 1] }}
+                                                        className={`mt-5 rounded-2xl overflow-hidden ${isDefault ? 'bg-paper-sunken' : ''}`}
                                                         style={isDefault ? undefined : { backgroundColor: inkSubtle }}
                                                     >
+                                                    <div className="space-y-5 p-5 md:p-6">
                                                         <div>
                                                             <span
                                                                 className={`text-[11px] font-semibold block mb-2 ${isDefault ? 'text-ink-faint' : ''}`}
@@ -749,7 +766,9 @@ export default function IdeasPage() {
                                                             </p>
                                                         </div>
                                                     </div>
+                                                    </motion.div>
                                                 )}
+                                                </AnimatePresence>
                                             </div>
 
                                             {/* Card Bottom Row */}
@@ -796,7 +815,7 @@ export default function IdeasPage() {
                                                 </div>
                                             </div>
                                         </div>
-                                    </div>
+                                    </motion.div>
                                 )
                             })}
                         </div>

@@ -54,7 +54,7 @@ Vercel: `main` stays Production. `vnext-workspace` is added as a tracked Preview
 | M3 | Concept Library UI | done | first user-visible release; /concepts + /concepts/[id] |
 | M4 | Brainstorm Inbox | done | /inbox + brainstorm.ts + brainstorm API surface |
 | M5 | Pillar Workspace + DnD | done | /workspace + drag-drop + merge + split |
-| M6 | Research pass + multi-candidate ranking | pending | depends on M2 |
+| M6 | Research pass + multi-candidate ranking | done | research.ts + /api/research + auto-enrichment in generate |
 | M7 | Auto-ideas dual-write cutover | pending | depends on M2 |
 | M8 | Hardening (rate limits, headers, E2E) | pending | depends on M3+M4+M5 |
 | M9 | Prod cutover | pending | merge + flag flip |
@@ -71,6 +71,34 @@ Each milestone appends a section here when it lands. Format:
 > - any deviations from the plan
 
 (Sections appended below as milestones complete.)
+
+### M6 — Research pass + multi-candidate ranking (2026-05-03)
+
+A pre-pass for `/concepts/generate` that grounds PASS 1 in real signal — the user's own past transcripts (via the existing `match_transcripts_by_essence` RPC) plus current `tiktok_trends` and `reddit_trends` rows for the pillar's industry/subreddits. **No web scraping**, no external HTTP egress; all signal comes from data we already have. The free-tier rule is preserved.
+
+- `src/lib/concepts/research.ts` — `runResearch({supabase, userId, topic, pillarId})`. Embeds the topic (1 HF call), pulls top-5 transcripts above similarity 0.45, recent 5 TikTok trends matching the pillar's `tiktok_industry_id`, recent 5 Reddit posts from the pillar's `reddit_subreddits`, then summarizes via 1 Groq call with strict-JSON output. **Citations are deterministic** — built from the rows we pulled, not invented by the LLM, so the UI can link back to original transcripts/trends.
+- `src/app/api/research/route.ts` — `POST {topic, pillar_id?}` returns `{summary, citations}`. Gated by `NEXT_PUBLIC_RESEARCH_PASS` (independent of `CONCEPT_PIPELINE` so a future standalone surface can use it). Per-user rate limit reuses the `llmGeneration` bucket. 1 Groq + 1 HF.
+- `src/app/api/concepts/generate/route.ts` — wires research in. When `RESEARCH_PASS=true`:
+    1. Build the topic from the seed (`brainstorm.raw_text` / `transcript.essence` / `trend.label`) or from the pillar's name + description.
+    2. Call `runResearch` (try/catch, **non-fatal**: if HF cold-starts or no signal exists, generation continues without enrichment).
+    3. Pass `researchSummary` to `runConceptGenerator` (PASS 1 already accepted this argument since M2; the prompt block was waiting).
+    4. Persist the summary on every inserted concept's `research_summary` column so the detail page renders it (the field was already wired in M3 UI).
+    5. Return `research_summary` + `research_citations` in the response so the library page can show "research-grounded" UI later.
+- `src/lib/concepts/index.ts` — barrel re-exports `runResearch`, `RESEARCH_SYSTEM_MESSAGE`, types.
+
+**Cost when flag is on:** 4 Groq + ~6 HF calls per generation (was 3 + ~5). Per-user 10/min rate limit unchanged. Under the 30 RPM Groq ceiling, the pre-pass is ~7 generations/min/user worst case — still comfortably free-tier.
+
+What's deliberately NOT in M6:
+
+- No external web research (no scraping, no paid APIs, no SerpAPI). Strictly own-corpus + already-cached trends.
+- No citation rendering UI. The data is in the response and on the concept row; a "research" expandable section on cards/detail page is fine to add later as polish, but the underlying data exists today.
+- No "research mode" toggle in the UI (e.g. let the user opt-in per generation rather than env-flag globally). Defer to M8 polish.
+- No prompt-iteration tuning of the validator using collected `concept_events` data. The plan called this out as a Phase 3 deliverable but it needs real usage data first; it's a post-merge follow-up.
+
+Verification:
+
+- `npm test` → 12/12 (no new tests; research module is mostly a context-builder + LLM call, integration-tested by future Playwright runs).
+- `npx tsc --noEmit` → clean.
 
 ### M5 — Pillar Workspace + DnD (2026-05-03)
 

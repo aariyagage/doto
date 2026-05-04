@@ -13,12 +13,13 @@
 
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { flagFor } from '@/lib/env';
+import { flagFor, featureFlags } from '@/lib/env';
 import { rateLimit, RATE_LIMITS } from '@/lib/rate-limit';
 import {
     runConceptGenerator,
     runValidator,
     runStylistBatch,
+    runResearch,
     openPipelineRun,
     closePipelineRun,
     recordConceptEventsBulk,
@@ -26,6 +27,7 @@ import {
     type ConceptSourceKind,
     type PipelineErrorKind,
     type PipelineRunHandle,
+    type ResearchCitation,
 } from '@/lib/concepts';
 import type { StylistVoiceProfile } from '@/lib/concepts/prompts/stylist-prompt';
 
@@ -112,8 +114,45 @@ export async function POST(request: Request) {
             supabase,
             userId: user.id,
             kind: 'generate',
-            metadata: { pillar_id: body.pillar_id, count, seed_kind: seed?.kind ?? null },
+            metadata: {
+                pillar_id: body.pillar_id,
+                count,
+                seed_kind: seed?.kind ?? null,
+                research_pass: featureFlags.researchPass(),
+            },
         });
+
+        // ---- Optional pre-pass: research ----
+        // When NEXT_PUBLIC_RESEARCH_PASS=true, pull own-corpus + trends
+        // signals so PASS 1 can ground concepts in real data. Non-fatal:
+        // if research fails (HF cold-start, parse error, no data), we
+        // log and continue without enrichment. The cost is +1 Groq + 1 HF
+        // per generation when on (4 Groq total instead of 3).
+        let researchSummary: string | null = null;
+        let researchCitations: ResearchCitation[] = [];
+        if (featureFlags.researchPass()) {
+            const researchTopic = seed?.kind === 'brainstorm' ? seed.raw_text
+                : seed?.kind === 'transcript' ? seed.essence
+                : seed?.kind === 'trend' ? seed.label
+                : `${pillarRow.name}: ${pillarRow.description ?? ''}`.slice(0, 400);
+
+            try {
+                const r = await runResearch({
+                    supabase,
+                    userId: user.id,
+                    topic: researchTopic,
+                    pillarId: body.pillar_id,
+                });
+                researchSummary = r.summary;
+                researchCitations = r.citations;
+                if (runHandle) {
+                    runHandle.groqCalls += r.groqCalls;
+                    runHandle.hfCalls += r.hfCalls;
+                }
+            } catch (err) {
+                console.warn('generate: research pass failed, continuing without enrichment:', err);
+            }
+        }
 
         // ---- PASS 1: concept generation ----
         const gen = await runConceptGenerator({
@@ -125,6 +164,7 @@ export async function POST(request: Request) {
             },
             recentEssences,
             seed,
+            researchSummary,
             count,
         });
         if (runHandle) {
@@ -205,6 +245,7 @@ export async function POST(request: Request) {
                 angle: candidate.angle || null,
                 structure: candidate.structure ?? null,
                 ai_reason: candidate.ai_reason || null,
+                research_summary: researchSummary,
                 score: score as unknown as Record<string, number>,
                 voice_adapted_title: styled?.voice_adapted_title ?? null,
                 voice_adapted_hook:  styled?.voice_adapted_hook ?? null,
@@ -279,6 +320,8 @@ export async function POST(request: Request) {
                     rejected: validated.rejected.length,
                     styled_top_k: styledMap.size,
                     tail_unstyled: tail.length,
+                    research_summary_present: Boolean(researchSummary),
+                    research_citations: researchCitations.length,
                 },
             });
         }
@@ -287,6 +330,8 @@ export async function POST(request: Request) {
             pipeline_run_id: runHandle?.id ?? null,
             concepts: inserted ?? [],
             rejected_count: validated.rejected.length,
+            research_summary: researchSummary,
+            research_citations: researchCitations,
         });
     } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);

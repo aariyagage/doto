@@ -62,3 +62,13 @@ export type {
     PromoteArgs,
     PromoteResult,
 } from './brainstorm';
+
+export {
+    runResearch,
+    RESEARCH_SYSTEM_MESSAGE,
+} from './research';
+export type {
+    RunResearchArgs,
+    ResearchResult,
+    ResearchCitation,
+} from './research';

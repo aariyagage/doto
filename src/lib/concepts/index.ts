@@ -72,3 +72,6 @@ export type {
     ResearchResult,
     ResearchCitation,
 } from './research';
+
+export { topUpConceptsForPillars } from './topup';
+export type { TopUpConceptsArgs, TopUpConceptsResult } from './topup';

@@ -55,7 +55,7 @@ Vercel: `main` stays Production. `vnext-workspace` is added as a tracked Preview
 | M4 | Brainstorm Inbox | done | /inbox + brainstorm.ts + brainstorm API surface |
 | M5 | Pillar Workspace + DnD | done | /workspace + drag-drop + merge + split |
 | M6 | Research pass + multi-candidate ranking | done | research.ts + /api/research + auto-enrichment in generate |
-| M7 | Auto-ideas dual-write cutover | pending | depends on M2 |
+| M7 | Auto-ideas dual-write cutover | done | upload pipeline branches on CONCEPT_PIPELINE |
 | M8 | Hardening (rate limits, headers, E2E) | pending | depends on M3+M4+M5 |
 | M9 | Prod cutover | pending | merge + flag flip |
 
@@ -71,6 +71,28 @@ Each milestone appends a section here when it lands. Format:
 > - any deviations from the plan
 
 (Sections appended below as milestones complete.)
+
+### M7 — Auto-ideas dual-write cutover (2026-05-03)
+
+After a video uploads + tags into pillars, the upload pipeline kicks off a "top-up" so each pillar has a few unused suggestions waiting. Until M7 this only wrote to `content_ideas` (the legacy `/ideas` table). M7 routes that write to `concepts` instead when `NEXT_PUBLIC_CONCEPT_PIPELINE=true`. Existing `/ideas` users (flag off) see no change.
+
+- `src/lib/concepts/topup.ts` — `topUpConceptsForPillars({supabase, userId, pillarIds})`. Counts active concepts per pillar (status `draft` + `reviewed`), skips pillars already at or above `TARGET_UNUSED_PER_PILLAR=2`, runs PASS 1 + PASS 2 only (no eager styling, no research pre-pass) for each undersupplied pillar with `count=2`. **Cost: 2 Groq + ~2 HF per pillar topped up.** Per-pillar failures are isolated; one rate-limit hiccup doesn't lose the whole upload's worth of concepts.
+- `src/app/api/videos/process/route.ts` — branches at the existing auto-ideas hook. When `featureFlags.conceptPipeline()` is true → `topUpConceptsForPillars`; otherwise → existing `topUpIdeasForPillars`. Only one path runs per upload. The legacy code stays in place; nothing on `/ideas` regresses.
+- `src/app/api/pillars/[id]/concepts/topup/route.ts` — `POST` (no body). Manual trigger for the same helper. Useful as a recovery hook if upload tagging succeeded but topup failed, or as a future "fill this pillar" workspace action. Per-user rate limited (`llmGeneration` bucket).
+- `src/lib/concepts/index.ts` — barrel re-exports `topUpConceptsForPillars` + types.
+
+Why no PASS 3 in the topup: voice styling on tail concepts the user may never look at would burn ~60% of the per-pillar Groq budget for low return. Each concept gets `voice_adapted_*` lazily on first card open via `/api/concepts/[id]/style`.
+
+What's deliberately NOT in M7:
+
+- No "auto-research" on upload-spawned concepts. Even with `RESEARCH_PASS=true` globally, the topup skips research to keep upload latency predictable. Research only kicks in on user-initiated `/api/concepts/generate` clicks.
+- No backfill of historical uploads. M7 only changes the destination of *future* upload top-ups; existing `content_ideas` stay where they are. To pull saved/used legacy ideas into concepts, the user clicks "import my saved ideas" in the `/concepts` empty state (M3's `/api/concepts/import-legacy`).
+- No UI changes. The branch is invisible to the user — they just notice that after uploading a video with the flag on, fresh concepts appear in `/concepts` instead of `/ideas`.
+
+Verification:
+
+- `npm test` → 12/12 (no new tests; integration coverage in M8 Playwright).
+- `npx tsc --noEmit` → clean.
 
 ### M6 — Research pass + multi-candidate ranking (2026-05-03)
 

@@ -14,7 +14,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { flagFor, featureFlags } from '@/lib/env';
-import { rateLimit, RATE_LIMITS } from '@/lib/rate-limit';
+import { rateLimit, RATE_LIMITS, checkPerUserGroqQuota, projectedGroqCallsForKind } from '@/lib/rate-limit';
 import {
     runConceptGenerator,
     runValidator,
@@ -64,9 +64,7 @@ export async function POST(request: Request) {
             );
         }
 
-        // Per-user rate limit. The full M8 sliding-window-by-Groq-calls
-        // limiter is deferred; for now reuse the existing llmGeneration
-        // bucket so a single user can't burst beyond 10 generations/min.
+        // Per-endpoint in-memory burst limiter (per Vercel cold start).
         const rl = rateLimit({
             key: `concepts.generate:${user.id}`,
             ...RATE_LIMITS.llmGeneration,
@@ -75,6 +73,19 @@ export async function POST(request: Request) {
             return NextResponse.json(
                 { error: 'rate_limit', retry_after_seconds: rl.retryAfterSeconds },
                 { status: 429, headers: { 'Retry-After': String(rl.retryAfterSeconds) } },
+            );
+        }
+
+        // DB-backed cross-endpoint Groq budget check. 25 calls / 60s under
+        // the 30 RPM Groq free-tier cap. Worst-case 4 Groq calls for this
+        // route (PASS 1 + PASS 2 + PASS 3 + research).
+        const quota = await checkPerUserGroqQuota(
+            supabase, user.id, projectedGroqCallsForKind('generate'),
+        );
+        if (!quota.ok) {
+            return NextResponse.json(
+                { error: 'rate_limit', retry_after_seconds: quota.retryAfterSeconds, used_in_window: quota.usedInWindow },
+                { status: 429, headers: { 'Retry-After': String(quota.retryAfterSeconds) } },
             );
         }
 

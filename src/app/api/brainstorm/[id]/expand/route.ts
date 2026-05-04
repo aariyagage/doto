@@ -7,7 +7,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { flagFor } from '@/lib/env';
-import { rateLimit, RATE_LIMITS } from '@/lib/rate-limit';
+import { rateLimit, RATE_LIMITS, checkPerUserGroqQuota, projectedGroqCallsForKind } from '@/lib/rate-limit';
 import {
     expandBrainstormNote,
     openPipelineRun,
@@ -30,6 +30,13 @@ export async function POST(_request: Request, { params }: { params: { id: string
             return NextResponse.json(
                 { error: 'rate_limit', retry_after_seconds: rl.retryAfterSeconds },
                 { status: 429, headers: { 'Retry-After': String(rl.retryAfterSeconds) } },
+            );
+        }
+        const quota = await checkPerUserGroqQuota(supabase, user.id, projectedGroqCallsForKind('expand'));
+        if (!quota.ok) {
+            return NextResponse.json(
+                { error: 'rate_limit', retry_after_seconds: quota.retryAfterSeconds, used_in_window: quota.usedInWindow },
+                { status: 429, headers: { 'Retry-After': String(quota.retryAfterSeconds) } },
             );
         }
 

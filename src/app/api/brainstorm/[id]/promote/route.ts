@@ -11,7 +11,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { flagFor } from '@/lib/env';
-import { rateLimit, RATE_LIMITS } from '@/lib/rate-limit';
+import { rateLimit, RATE_LIMITS, checkPerUserGroqQuota } from '@/lib/rate-limit';
 import {
     promoteBrainstormToDraftConcept,
     openPipelineRun,
@@ -40,6 +40,15 @@ export async function POST(request: Request, { params }: { params: { id: string 
             return NextResponse.json(
                 { error: 'rate_limit', retry_after_seconds: rl.retryAfterSeconds },
                 { status: 429, headers: { 'Retry-After': String(rl.retryAfterSeconds) } },
+            );
+        }
+        // Promote runs PASS 1 only (1 Groq) but we project 2 to be conservative
+        // since the underlying generator could fail and retry under load.
+        const quota = await checkPerUserGroqQuota(supabase, user.id, 2);
+        if (!quota.ok) {
+            return NextResponse.json(
+                { error: 'rate_limit', retry_after_seconds: quota.retryAfterSeconds, used_in_window: quota.usedInWindow },
+                { status: 429, headers: { 'Retry-After': String(quota.retryAfterSeconds) } },
             );
         }
 

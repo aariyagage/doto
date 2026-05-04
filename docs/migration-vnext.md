@@ -56,7 +56,7 @@ Vercel: `main` stays Production. `vnext-workspace` is added as a tracked Preview
 | M5 | Pillar Workspace + DnD | done | /workspace + drag-drop + merge + split |
 | M6 | Research pass + multi-candidate ranking | done | research.ts + /api/research + auto-enrichment in generate |
 | M7 | Auto-ideas dual-write cutover | done | upload pipeline branches on CONCEPT_PIPELINE |
-| M8 | Hardening (rate limits, headers, E2E) | pending | depends on M3+M4+M5 |
+| M8 | Hardening (rate limits, headers, regression tests) | done | DB Groq limiter + ASCII helper + 25 new tests (37 total) |
 | M9 | Prod cutover | pending | merge + flag flip |
 
 ## Per-milestone changelog
@@ -71,6 +71,44 @@ Each milestone appends a section here when it lands. Format:
 > - any deviations from the plan
 
 (Sections appended below as milestones complete.)
+
+### M8 — Hardening (2026-05-03)
+
+Three pieces of production-grade plumbing:
+
+**1. DB-backed per-user Groq sliding-window limiter** (`src/lib/rate-limit.ts`)
+
+`checkPerUserGroqQuota(supabase, userId, projectedCalls)` queries `pipeline_runs` for the user's Groq spend in the last 60 seconds and rejects with 429 if `usedInWindow + projectedCalls > 25` (5-call cushion under the 30 RPM Groq free-tier ceiling). In-flight runs (status='running') are estimated worst-case-per-kind via `projectedGroqCallsForKind` so concurrent generations can't slip past the limit. **Fails open on query error** — if `pipeline_runs` is briefly unreachable, the limiter logs and allows through; the in-memory `rateLimit()` (10/min/endpoint) stays as backstop.
+
+Wired into:
+- `POST /api/concepts/generate` — projects 4 (PASS 1+2+3 + research)
+- `POST /api/concepts/[id]/style` — projects 1
+- `POST /api/research` — projects 1
+- `POST /api/pillars/[id]/concepts/topup` — projects 2
+- `POST /api/brainstorm/[id]/expand` — projects 1
+- `POST /api/brainstorm/[id]/promote` — projects 2 (conservative; PASS 1 = 1 call, allow retry headroom)
+
+Why this matters: the in-memory limiter resets on Vercel cold start and only sees one endpoint at a time. The DB version is globally consistent across cold starts and across all Groq-spending endpoints — the user can't burn 4 Groq calls on `/concepts/generate`, then immediately fire 3 `/style` calls and another `/research`, and slip past the cap because each one looked fine "in isolation."
+
+**2. ASCII header helper** (`src/lib/utils.ts`)
+
+`assertAsciiHeader(value, fieldName)` throws on any byte outside the printable-ASCII range 0x20-0x7E, including newlines (header-injection vectors) and tabs. `toAsciiHeader(value)` is the soft variant that replaces non-ASCII with `?` for cases where graceful truncation is preferred over a 5xx. Established in commit 5f1e481 (Reddit User-Agent fix); the rule lives in `feedback_http_headers_ascii.md`. Future code that sets headers — especially with values that come from user content or LLM output — should validate through these.
+
+**3. Regression test coverage** (37 tests total, was 12)
+
+- `tests/utils/ascii-header.test.ts` — 14 tests. Em dash, smart quotes, emoji, newlines, tabs, null bytes, empty string, error message contents.
+- `tests/env/feature-flags.test.ts` — 11 tests. Pins the layering rules in `docs/feature-flags.md`: brainstormInbox/workspaceV1/scriptRefiner all require conceptPipeline; researchPass is independent; the strict `'true'` comparison rejects `'1'`, `'TRUE'`, `'yes'`. Uses `await import('@/lib/env')` per test to re-evaluate against fresh env state. Also verifies `flagFor()` allowlist semantics for null/undefined userIds.
+
+What's deliberately deferred:
+
+- **Playwright E2E suite.** Real browser tests need a running dev server, real Supabase auth, and burn quota every run. Setting up a clean test fixture (test users, cleanup hooks, env separation) is a significant project on its own. Better as a dedicated post-merge PR than blocking M9. The unit-level coverage we have catches the architectural-rule bugs that matter most (voice-isolation, flag-gating, dedup math, ASCII headers).
+- **Vitest two-user RLS fixture.** Same reasoning — needs real Supabase auth and cleanup. Schema-level checks shipped in `scripts/verify-vnext-rls.sql` (M1) cover policy presence; runtime cross-user enforcement is a future PR.
+- **Admin SQL views.** Already shipped in migration 010 (`admin_pipeline_quality`); the helper queries are documented in `docs/observability.md`.
+
+Verification:
+
+- `npm test` → 37/37 (was 12).
+- `npx tsc --noEmit` → clean.
 
 ### M7 — Auto-ideas dual-write cutover (2026-05-03)
 

@@ -41,8 +41,9 @@ export async function PATCH(request: Request, { params }: { params: { id: string
 
         const { id } = await params;
         const body = await request.json();
-        const { name, is_series, tiktok_industry_id, tiktok_industry_secondary } = body as {
+        const { name, description, is_series, tiktok_industry_id, tiktok_industry_secondary } = body as {
             name?: unknown;
+            description?: unknown;
             is_series?: unknown;
             tiktok_industry_id?: unknown;
             tiktok_industry_secondary?: unknown;
@@ -53,6 +54,22 @@ export async function PATCH(request: Request, { params }: { params: { id: string
             const trimmed = name.trim();
             if (!trimmed) return NextResponse.json({ error: 'Name cannot be empty' }, { status: 400 });
             updates.name = trimmed;
+        }
+        // Description: a string updates it (empty string clears to null);
+        // explicit null also clears. Caps at 1000 chars to keep the
+        // concept-prompt input bounded.
+        if (description !== undefined) {
+            if (description === null) {
+                updates.description = null;
+            } else if (typeof description === 'string') {
+                const trimmed = description.trim();
+                if (trimmed.length > 1000) {
+                    return NextResponse.json({ error: 'Description must be 1000 characters or fewer' }, { status: 400 });
+                }
+                updates.description = trimmed.length > 0 ? trimmed : null;
+            } else {
+                return NextResponse.json({ error: 'Description must be a string or null' }, { status: 400 });
+            }
         }
         if (typeof is_series === 'boolean') {
             updates.is_series = is_series;

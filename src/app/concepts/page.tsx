@@ -96,6 +96,11 @@ export default function ConceptsPage() {
     const [isRegeneratingPillars, setIsRegeneratingPillars] = useState(false)
     const [pillarState, setPillarState] = useState<PillarState | null>(null)
 
+    // Description editor: only one at a time, scoped to a pillar id.
+    const [editingDescriptionPillarId, setEditingDescriptionPillarId] = useState<string | null>(null)
+    const [descriptionDraft, setDescriptionDraft] = useState('')
+    const [isSavingDescription, setIsSavingDescription] = useState(false)
+
     const showToast = useCallback((message: string) => {
         const id = Math.random().toString()
         setToasts(prev => [...prev, { id, message }])
@@ -261,6 +266,54 @@ export default function ConceptsPage() {
     const startEditingPillar = (id: string, currentName: string) => {
         setEditingPillarId(id)
         setEditingPillarName(currentName)
+    }
+
+    const startEditingDescription = (id: string, current: string | null | undefined) => {
+        setEditingDescriptionPillarId(id)
+        setDescriptionDraft(current ?? '')
+    }
+
+    const cancelEditingDescription = () => {
+        setEditingDescriptionPillarId(null)
+        setDescriptionDraft('')
+    }
+
+    const savePillarDescription = async (id: string) => {
+        const next = descriptionDraft.trim()
+        const original = pillars.find(p => p.id === id)?.description ?? null
+        const normalizedOriginal = (original ?? '').trim()
+        if (next === normalizedOriginal) {
+            cancelEditingDescription()
+            return
+        }
+        if (next.length > 1000) {
+            showToast('Description must be 1000 characters or fewer')
+            return
+        }
+
+        setIsSavingDescription(true)
+        // Optimistic update
+        setPillars(prev => prev.map(p => (p.id === id ? { ...p, description: next || null } : p)))
+        const token = await getToken()
+        try {
+            const res = await fetch(`/api/pillars/${id}`, {
+                method: 'PATCH',
+                headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ description: next }),
+            })
+            if (!res.ok) {
+                const data = await res.json().catch(() => ({}))
+                throw new Error(data.error ?? `HTTP ${res.status}`)
+            }
+            showToast(next ? 'Description saved' : 'Description cleared')
+            cancelEditingDescription()
+        } catch (err) {
+            setPillars(prev => prev.map(p => (p.id === id ? { ...p, description: original } : p)))
+            const msg = err instanceof Error ? err.message : 'Failed to save description'
+            showToast(msg)
+        } finally {
+            setIsSavingDescription(false)
+        }
     }
 
     const generateForSelected = async () => {
@@ -617,6 +670,84 @@ export default function ConceptsPage() {
                                 })}
                             </div>
                         </div>
+
+                        {/* Pillar description: only shown when a pillar is
+                            selected. The description feeds directly into the
+                            concept-generator prompt — surfacing it here lets
+                            the user see what context the LLM has and edit it. */}
+                        {selectedPillar && (
+                            <div className="rounded-2xl border border-rule bg-paper-elevated p-5 mb-2">
+                                <div className="flex items-start justify-between gap-3">
+                                    <div className="min-w-0 flex-1">
+                                        <div className="flex items-center gap-2 mb-1">
+                                            <span className="text-[11px] font-semibold uppercase tracking-wide text-ink-faint">
+                                                {selectedPillar.is_series ? 'series description' : 'pillar description'}
+                                            </span>
+                                            <span className="text-[10px] text-ink-faint">
+                                                ({selectedPillar.name})
+                                            </span>
+                                        </div>
+                                        {editingDescriptionPillarId === selectedPillar.id ? (
+                                            <textarea
+                                                value={descriptionDraft}
+                                                onChange={e => setDescriptionDraft(e.target.value)}
+                                                placeholder="What is this pillar about? Concept generation uses this directly — be specific about angles, recurring themes, audience, anything you'd want every concept to reflect."
+                                                rows={4}
+                                                maxLength={1000}
+                                                autoFocus
+                                                onKeyDown={e => {
+                                                    if (e.key === 'Escape') cancelEditingDescription()
+                                                    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) savePillarDescription(selectedPillar.id)
+                                                }}
+                                                className="w-full mt-1 px-3 py-2 rounded-lg border border-rule bg-paper text-ink text-sm focus:outline-none focus:ring-2 focus:ring-ink/20 focus:border-ink/40 resize-none"
+                                            />
+                                        ) : selectedPillar.description ? (
+                                            <p className="text-sm text-ink leading-relaxed whitespace-pre-wrap">
+                                                {selectedPillar.description}
+                                            </p>
+                                        ) : (
+                                            <p className="text-sm italic text-ink-muted">
+                                                no description yet — add context so generated concepts stay anchored to what this pillar is really about.
+                                            </p>
+                                        )}
+                                    </div>
+                                    <div className="shrink-0">
+                                        {editingDescriptionPillarId === selectedPillar.id ? (
+                                            <div className="flex items-center gap-1.5">
+                                                <Button
+                                                    onClick={() => savePillarDescription(selectedPillar.id)}
+                                                    disabled={isSavingDescription}
+                                                    className="bg-ink text-paper hover:bg-ink/90 rounded-full px-4 py-1.5 text-xs font-medium"
+                                                >
+                                                    {isSavingDescription ? (
+                                                        <><Loader2 className="mr-1.5 h-3 w-3 animate-spin" /> saving</>
+                                                    ) : 'save'}
+                                                </Button>
+                                                <button
+                                                    onClick={cancelEditingDescription}
+                                                    disabled={isSavingDescription}
+                                                    className="text-xs font-medium text-ink-muted hover:text-ink px-3 py-1.5 rounded-full"
+                                                >
+                                                    cancel
+                                                </button>
+                                            </div>
+                                        ) : (
+                                            <button
+                                                onClick={() => startEditingDescription(selectedPillar.id, selectedPillar.description)}
+                                                className="text-xs font-medium text-ink-muted hover:text-ink bg-ink/[0.06] hover:bg-ink/[0.1] rounded-full px-4 py-1.5 transition-colors"
+                                            >
+                                                {selectedPillar.description ? 'edit' : 'add description'}
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+                                {editingDescriptionPillarId === selectedPillar.id && (
+                                    <p className="text-[11px] text-ink-faint mt-2">
+                                        {descriptionDraft.length}/1000 · ⌘+enter to save · esc to cancel
+                                    </p>
+                                )}
+                            </div>
+                        )}
 
                         {/* Status tabs. */}
                         <div className="flex gap-1 p-1 bg-ink/5 dark:bg-ink/5 rounded-lg w-fit">

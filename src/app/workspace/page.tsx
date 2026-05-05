@@ -555,6 +555,16 @@ function PillarColumn({
                 </div>
             </div>
 
+            {/* Description, when set — feeds the concept generator. */}
+            {pillar.description && (
+                <p
+                    className="px-4 pt-2 text-[11px] text-ink-muted leading-snug line-clamp-2"
+                    title={pillar.description}
+                >
+                    {pillar.description}
+                </p>
+            )}
+
             {/* Concept list */}
             <div className="p-3 space-y-2 min-h-[200px] max-h-[70vh] overflow-y-auto">
                 {concepts.length === 0 && (

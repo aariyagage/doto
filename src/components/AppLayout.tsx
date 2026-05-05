@@ -9,7 +9,6 @@ import {
     LayoutGrid,
     UploadCloud,
     FolderOpen,
-    Lightbulb,
     Sparkles,
     Inbox,
     Layers,
@@ -29,17 +28,14 @@ interface NavItem {
     flag?: 'conceptPipeline' | 'brainstormInbox' | 'workspaceV1'
 }
 
-// Order: dashboard, INBOX (new — gated), upload, library, ideas (legacy),
-// CONCEPTS (new — gated), WORKSPACE (new — gated), voice. Inbox sits
-// early because the daily capture flow is meant to be a quick first stop.
-// Concepts + Workspace cluster next to ideas during the transition so
-// dogfooders can hop between surfaces.
+// Order: dashboard, inbox (gated), upload, library, concepts (canonical
+// idea + pillar surface), workspace (gated kanban view), voice. /ideas
+// was retired into /concepts — old bookmarks redirect via next.config.
 const NAV_ITEMS: NavItem[] = [
     { label: 'dashboard', path: '/dashboard', Icon: LayoutGrid },
     { label: 'inbox', path: '/inbox', Icon: Inbox, flag: 'brainstormInbox' },
     { label: 'upload', path: '/upload', Icon: UploadCloud },
     { label: 'library', path: '/videos', Icon: FolderOpen },
-    { label: 'ideas', path: '/ideas', Icon: Lightbulb },
     { label: 'concepts', path: '/concepts', Icon: Sparkles, flag: 'conceptPipeline' },
     { label: 'workspace', path: '/workspace', Icon: Layers, flag: 'workspaceV1' },
     { label: 'voice', path: '/voice-profile', Icon: Mic },

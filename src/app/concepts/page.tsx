@@ -1,15 +1,15 @@
 'use client'
 
-// /concepts — Concept Library.
+// /concepts — Concept Library + pillar management.
 //
-// First user-visible vNext surface. Mirrors /ideas patterns (pillar chip
-// filter, card grid, optimistic mutations, toast) but for the new
-// concepts data model.
+// Canonical surface for both pillar lifecycle (discover, rename, delete,
+// merge nudges) and concept ideation. /ideas was retired into here so
+// users have a single home; legacy ideas can still be pulled forward via
+// the import-legacy button.
 //
 // Status filter: All / Saved / Used / Archive (the last bucket includes
 // rejected + archived statuses). Draft and Reviewed merge into All by
-// default — this is more compact than a 6-tab strip and matches /ideas'
-// 3-tab cadence.
+// default.
 //
 // Generate: requires exactly one selected pillar so we can call
 // /api/concepts/generate with a single pillar_id. The button label
@@ -30,6 +30,17 @@ interface Pillar {
     color: string
     description?: string | null
     is_series?: boolean
+    last_tagged_at?: string | null
+}
+
+interface PillarState {
+    pillarCount: number
+    isOverSoftCap: boolean
+    softCap: number
+    untaggedRecentVideos: number
+    staleNudgeThreshold: number
+    shouldShowStaleNudge: boolean
+    eligibleTranscriptCount: number
 }
 
 interface ConceptScore {
@@ -78,6 +89,13 @@ export default function ConceptsPage() {
     const [showVoiceAdapted, setShowVoiceAdapted] = useState(true)
     const [toasts, setToasts] = useState<{ id: string; message: string }[]>([])
 
+    // Pillar management state (formerly on /ideas)
+    const [editingPillarId, setEditingPillarId] = useState<string | null>(null)
+    const [editingPillarName, setEditingPillarName] = useState('')
+    const [isDeletingPillars, setIsDeletingPillars] = useState(false)
+    const [isRegeneratingPillars, setIsRegeneratingPillars] = useState(false)
+    const [pillarState, setPillarState] = useState<PillarState | null>(null)
+
     const showToast = useCallback((message: string) => {
         const id = Math.random().toString()
         setToasts(prev => [...prev, { id, message }])
@@ -89,6 +107,17 @@ export default function ConceptsPage() {
         return data.session?.access_token
     }, [supabase])
 
+    const fetchPillarState = useCallback(async () => {
+        try {
+            const res = await fetch('/api/pillars/state')
+            if (!res.ok) return
+            const data: PillarState = await res.json()
+            setPillarState(data)
+        } catch (e) {
+            console.error('Failed to fetch pillar state:', e)
+        }
+    }, [])
+
     // Initial load: pillars (direct via supabase client) + concepts (API).
     useEffect(() => {
         const loadData = async () => {
@@ -99,6 +128,8 @@ export default function ConceptsPage() {
                 .select('*')
                 .order('created_at', { ascending: true })
             if (pillarsData) setPillars(pillarsData)
+
+            await fetchPillarState()
 
             const token = await getToken()
             if (token) {
@@ -119,12 +150,117 @@ export default function ConceptsPage() {
             setIsLoading(false)
         }
         loadData()
-    }, [supabase, getToken, showToast])
+    }, [supabase, getToken, showToast, fetchPillarState])
 
     const togglePillar = (id: string) => {
         // Single-select for the generate flow. Clicking the same pillar
         // again deselects (back to "All").
         setSelectedPillars(prev => (prev.length === 1 && prev[0] === id ? [] : [id]))
+    }
+
+    // ---- Pillar management ------------------------------------------------
+
+    const deletePillar = async (e: React.MouseEvent, id: string) => {
+        e.stopPropagation()
+        const token = await getToken()
+        try {
+            const res = await fetch(`/api/pillars/${id}`, {
+                method: 'DELETE',
+                headers: { Authorization: `Bearer ${token}` },
+            })
+            if (res.ok) {
+                setPillars(prev => prev.filter(p => p.id !== id))
+                setSelectedPillars(prev => prev.filter(pid => pid !== id))
+                fetchPillarState()
+                showToast('Pillar deleted')
+            } else throw new Error()
+        } catch {
+            showToast('Failed to delete pillar')
+        }
+    }
+
+    const deleteAllPillars = async () => {
+        if (!confirm('Are you sure you want to delete ALL content pillars?')) return
+        setIsDeletingPillars(true)
+        const token = await getToken()
+        try {
+            const res = await fetch('/api/pillars', {
+                method: 'DELETE',
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ confirm: 'DELETE_ALL_PILLARS' }),
+            })
+            if (res.ok) {
+                setPillars([])
+                setSelectedPillars([])
+                fetchPillarState()
+                showToast('All pillars deleted')
+            } else throw new Error()
+        } catch {
+            showToast('Failed to clear pillars')
+        } finally {
+            setIsDeletingPillars(false)
+        }
+    }
+
+    const regeneratePillars = async () => {
+        setIsRegeneratingPillars(true)
+        const token = await getToken()
+        try {
+            const res = await fetch('/api/pillars/generate', {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${token}` },
+            })
+            const body = await res.json().catch(() => ({}))
+            if (res.ok) {
+                const { data } = await supabase.from('pillars').select('*').order('created_at', { ascending: true })
+                if (data) setPillars(data)
+                await fetchPillarState()
+                showToast('pillars regenerated!')
+            } else {
+                const msg = body && typeof body.error === 'string' ? body.error : `Failed to regenerate (HTTP ${res.status})`
+                showToast(msg)
+            }
+        } catch (err) {
+            const msg = err instanceof Error ? err.message : 'Failed to regenerate'
+            showToast(msg)
+        } finally {
+            setIsRegeneratingPillars(false)
+        }
+    }
+
+    const savePillarRename = async (id: string) => {
+        if (!editingPillarName.trim()) {
+            setEditingPillarId(null)
+            return
+        }
+        const originalName = pillars.find(p => p.id === id)?.name || ''
+        if (originalName === editingPillarName.trim()) {
+            setEditingPillarId(null)
+            return
+        }
+        setPillars(prev => prev.map(p => (p.id === id ? { ...p, name: editingPillarName.trim() } : p)))
+        setEditingPillarId(null)
+        const token = await getToken()
+        try {
+            const res = await fetch(`/api/pillars/${id}`, {
+                method: 'PATCH',
+                headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name: editingPillarName.trim() }),
+            })
+            if (!res.ok) throw new Error()
+            showToast('Pillar renamed')
+        } catch {
+            setPillars(prev => prev.map(p => (p.id === id ? { ...p, name: originalName } : p)))
+            showToast('Failed to rename pillar')
+        }
+    }
+
+    const startEditingPillar = (id: string, currentName: string) => {
+        setEditingPillarId(id)
+        setEditingPillarName(currentName)
     }
 
     const generateForSelected = async () => {
@@ -360,25 +496,79 @@ export default function ConceptsPage() {
                             </div>
                         </div>
 
-                        {/* Pillar chip row (single-select for generate). */}
+                        {/* Pillar row: management + single-select filter for generate. */}
                         <div className="mb-4">
                             <div className="flex items-start justify-between mb-5">
                                 <div>
-                                    <h3 className="text-title-3 text-ink leading-tight">filter by pillar</h3>
+                                    <h3 className="text-title-3 text-ink leading-tight">your content pillars</h3>
                                     <p className="text-ink-muted text-sm mt-1">
-                                        click a pillar to filter the list and unlock the generate button for that pillar.
+                                        folders for your videos. click a pillar to filter the list and unlock generate for that pillar.
                                     </p>
                                 </div>
+                                <div className="flex items-center gap-2">
+                                    {pillars.length > 0 && (
+                                        <button
+                                            onClick={deleteAllPillars}
+                                            disabled={isDeletingPillars}
+                                            className="text-xs font-medium text-red-500 hover:text-red-600 transition-colors flex items-center whitespace-nowrap bg-red-50 dark:bg-red-500/10 hover:bg-red-100 dark:hover:bg-red-500/20 px-3 py-1.5 rounded-lg"
+                                        >
+                                            {isDeletingPillars ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : <Trash2 className="h-4 w-4 mr-1.5" />}
+                                            clear all
+                                        </button>
+                                    )}
+                                    {(pillarState?.eligibleTranscriptCount ?? 0) >= 1 && (
+                                        <button
+                                            onClick={regeneratePillars}
+                                            disabled={isRegeneratingPillars}
+                                            className="text-xs font-medium text-blue-600 hover:text-blue-700 transition-colors flex items-center whitespace-nowrap bg-blue-50 dark:bg-blue-500/10 hover:bg-blue-100 px-3 py-1.5 rounded-lg"
+                                        >
+                                            {isRegeneratingPillars ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : <RefreshCw className="h-4 w-4 mr-1.5" />}
+                                            {pillars.length === 0 ? 'discover pillars' : 'regenerate'}
+                                        </button>
+                                    )}
+                                </div>
                             </div>
+
+                            {/* Soft-cap nudge: pillar list is getting unwieldy. */}
+                            {pillarState?.isOverSoftCap && (
+                                <div className="mb-4 px-4 py-3 rounded-lg bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/30">
+                                    <p className="text-sm text-amber-900 dark:text-amber-100">
+                                        you have {pillarState.pillarCount} pillars. content tends to lose focus past {pillarState.softCap} —
+                                        consider deleting the least-tagged ones below.
+                                    </p>
+                                </div>
+                            )}
+
+                            {/* Stale-pillar nudge: recent uploads aren't fitting any existing pillar. */}
+                            {pillarState?.shouldShowStaleNudge && (
+                                <div className="mb-4 px-4 py-3 rounded-lg bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/30 flex items-center justify-between gap-4">
+                                    <p className="text-sm text-blue-900 dark:text-blue-100">
+                                        {pillarState.untaggedRecentVideos} recent video{pillarState.untaggedRecentVideos === 1 ? '' : 's'}{' '}
+                                        didn&apos;t fit any pillar. your content may have shifted.
+                                    </p>
+                                    <button
+                                        onClick={regeneratePillars}
+                                        disabled={isRegeneratingPillars}
+                                        className="text-xs font-medium text-blue-700 dark:text-blue-200 hover:underline whitespace-nowrap"
+                                    >
+                                        {isRegeneratingPillars ? 'regenerating…' : 'regenerate →'}
+                                    </button>
+                                </div>
+                            )}
+
                             <div className="flex flex-wrap gap-4 relative">
                                 {pillars.length === 0 ? (
-                                    <p className="text-ink-muted text-sm w-full">
-                                        no pillars yet.{' '}
-                                        <a href="/ideas" className="font-bold text-blue-600 hover:underline">
-                                            visit /ideas to create them
-                                        </a>{' '}
-                                        — concepts shares the same pillar list as legacy ideas.
-                                    </p>
+                                    (pillarState?.eligibleTranscriptCount ?? 0) < 1 ? (
+                                        <p className="text-ink-muted text-sm w-full">
+                                            upload a video to get started.{' '}
+                                            <a href="/upload" className="font-bold text-blue-600 hover:underline">upload now →</a>
+                                        </p>
+                                    ) : (
+                                        <p className="text-ink-faint text-sm italic w-full">
+                                            you have {pillarState?.eligibleTranscriptCount ?? 0} video{(pillarState?.eligibleTranscriptCount ?? 0) === 1 ? '' : 's'} ready.
+                                            click <span className="font-bold text-blue-600">discover pillars</span> above to organize them into folders.
+                                        </p>
+                                    )
                                 ) : (
                                     <AllIdeasFolderChip
                                         isSelected={selectedPillars.length === 0}
@@ -386,20 +576,45 @@ export default function ConceptsPage() {
                                     />
                                 )}
 
-                                {pillars.map(p => (
-                                    <PillarFolderChip
-                                        key={p.id}
-                                        name={p.name}
-                                        color={p.color}
-                                        isSelected={selectedPillars.includes(p.id)}
-                                        isSeries={p.is_series}
-                                        onClick={() => togglePillar(p.id)}
-                                        // No delete/rename here — pillar mutation lives on /ideas
-                                        // until M5 workspace ships.
-                                        onDelete={undefined as unknown as (e: React.MouseEvent) => void}
-                                        onRename={undefined as unknown as (e: React.MouseEvent) => void}
-                                    />
-                                ))}
+                                {pillars.map(p => {
+                                    const isSelected = selectedPillars.includes(p.id)
+                                    const isEditing = editingPillarId === p.id
+
+                                    if (isEditing) {
+                                        return (
+                                            <div key={p.id} className="group relative flex items-center h-12 bg-paper-elevated border-2 border-[#125603] rounded-md px-3 z-20">
+                                                <input
+                                                    type="text"
+                                                    value={editingPillarName}
+                                                    onChange={(e) => setEditingPillarName(e.target.value)}
+                                                    onKeyDown={(e) => {
+                                                        if (e.key === 'Enter') savePillarRename(p.id)
+                                                        if (e.key === 'Escape') setEditingPillarId(null)
+                                                    }}
+                                                    onBlur={() => savePillarRename(p.id)}
+                                                    autoFocus
+                                                    className="text-xs font-bold outline-none border-none py-1 min-w-[110px] bg-transparent text-ink"
+                                                />
+                                            </div>
+                                        )
+                                    }
+
+                                    return (
+                                        <PillarFolderChip
+                                            key={p.id}
+                                            name={p.name}
+                                            color={p.color}
+                                            isSelected={isSelected}
+                                            isSeries={p.is_series}
+                                            onClick={() => togglePillar(p.id)}
+                                            onDelete={(e) => deletePillar(e, p.id)}
+                                            onRename={(e) => {
+                                                e.stopPropagation()
+                                                startEditingPillar(p.id, p.name)
+                                            }}
+                                        />
+                                    )
+                                })}
                             </div>
                         </div>
 
@@ -443,7 +658,7 @@ export default function ConceptsPage() {
                                             {isImporting ? (
                                                 <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> importing…</>
                                             ) : (
-                                                <><RefreshCw className="mr-2 h-4 w-4" /> import my saved ideas from /ideas</>
+                                                <><RefreshCw className="mr-2 h-4 w-4" /> import my saved legacy ideas</>
                                             )}
                                         </Button>
                                     </>

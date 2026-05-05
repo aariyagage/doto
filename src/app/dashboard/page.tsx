@@ -111,13 +111,13 @@ export default function DashboardPage() {
                                 <div className="rounded-3xl border border-dashed border-rule bg-paper-elevated p-12 text-center">
                                     <h3 className="text-title-3 text-ink mb-2">no pillars yet</h3>
                                     <p className="text-body-sm text-ink-muted max-w-sm mx-auto mb-6">
-                                        upload a few videos, then run discover on the ideas page to surface your pillars.
+                                        upload a few videos, then run discover on the concepts page to surface your pillars.
                                     </p>
                                     <Link
-                                        href="/ideas"
+                                        href="/concepts"
                                         className="inline-flex items-center gap-2 text-body-sm font-medium text-ink hover:underline"
                                     >
-                                        go to ideas <ArrowUpRight className="h-4 w-4" />
+                                        go to concepts <ArrowUpRight className="h-4 w-4" />
                                     </Link>
                                 </div>
                             ) : (
@@ -127,7 +127,7 @@ export default function DashboardPage() {
                                         return (
                                             <Link
                                                 key={p.name}
-                                                href="/ideas"
+                                                href="/concepts"
                                                 className="group block rounded-2xl bg-paper-elevated border border-rule overflow-hidden hover:border-ink/20 transition-colors"
                                             >
                                                 <div className="h-1.5 w-full" style={{ backgroundColor: accent }} aria-hidden="true" />

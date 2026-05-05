@@ -12,6 +12,11 @@ const nextConfig = {
     typescript: {
         ignoreBuildErrors: true,
     },
+    async redirects() {
+        return [
+            { source: '/ideas', destination: '/concepts', permanent: true },
+        ];
+    },
 };
 
 export default nextConfig;

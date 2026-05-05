@@ -3,52 +3,61 @@
 import { useEffect, useState } from 'react'
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
 
-/**
- * Synonyms for "what your brain produces" — all describe the same downstream
- * artifact, so the meaning stays even as the word changes. Order picked for
- * cadence: alternating short/long.
- */
-const WORDS = ['content', 'reels', 'ideas', 'hooks', 'drafts'] as const
-const INTERVAL_MS = 2400
 const EASE = [0.25, 1, 0.5, 1] as const
 
-/** Soft manila pill behind the cycling word — tuned to be readable on the
- *  warm paper background without competing with the ink. */
 const HIGHLIGHT_BG = 'rgba(200, 181, 138, 0.42)'
 
+const VARIANTS = ['voice memos', 'half-ideas', 'rough notes', 'thoughts'] as const
+const WORD_HOLD_MS = 1100
+
 export default function HeroHeadline() {
-    const [idx, setIdx] = useState(0)
     const reduce = useReducedMotion()
+    const [idx, setIdx] = useState(0)
+    const isFinal = idx === VARIANTS.length - 1
 
     useEffect(() => {
-        if (reduce) return
-        const t = setInterval(() => setIdx(i => (i + 1) % WORDS.length), INTERVAL_MS)
-        return () => clearInterval(t)
-    }, [reduce])
+        if (reduce) {
+            setIdx(VARIANTS.length - 1)
+            return
+        }
+        if (isFinal) return
+        const t = setTimeout(() => setIdx(i => i + 1), WORD_HOLD_MS)
+        return () => clearTimeout(t)
+    }, [idx, reduce, isFinal])
+
+    const lineInitial = reduce ? { opacity: 0 } : { opacity: 0, y: 12 }
+    const lineAnimate = reduce ? { opacity: 1 } : { opacity: 1, y: 0 }
 
     return (
-        <h1 className="text-display-1 text-ink">
-            Your brain, organized into{' '}
+        <h1 className="text-display-1 text-ink text-pretty">
             <motion.span
-                layout
-                transition={{ layout: { duration: 0.45, ease: EASE } }}
-                className="relative inline-block align-baseline px-2 -mx-1 rounded-md"
-                style={{ backgroundColor: HIGHLIGHT_BG }}
+                initial={lineInitial}
+                animate={lineAnimate}
+                transition={{ duration: 0.6, ease: EASE, delay: 0.05 }}
+                className="block"
             >
-                <AnimatePresence mode="popLayout" initial={false}>
-                    <motion.span
-                        key={WORDS[idx]}
-                        initial={{ y: '0.6em', opacity: 0 }}
-                        animate={{ y: 0, opacity: 1 }}
-                        exit={{ y: '-0.6em', opacity: 0 }}
-                        transition={{ duration: 0.45, ease: EASE }}
-                        className="inline-block"
-                    >
-                        {WORDS[idx]}
-                    </motion.span>
-                </AnimatePresence>
+                turn your{' '}
+                <motion.span
+                    layout
+                    transition={{ layout: { duration: 0.45, ease: EASE } }}
+                    className="relative inline-block align-baseline px-2 -mx-1 rounded-md"
+                    style={{ backgroundColor: HIGHLIGHT_BG }}
+                >
+                    <AnimatePresence mode="popLayout" initial={false}>
+                        <motion.span
+                            key={VARIANTS[idx]}
+                            initial={{ y: '0.45em', opacity: 0 }}
+                            animate={{ y: 0, opacity: 1 }}
+                            exit={{ y: '-0.45em', opacity: 0 }}
+                            transition={{ duration: 0.4, ease: EASE }}
+                            className="inline-block whitespace-nowrap"
+                        >
+                            {VARIANTS[idx]}
+                        </motion.span>
+                    </AnimatePresence>
+                </motion.span>
+                {' '}into content.
             </motion.span>
-            .
         </h1>
     )
 }

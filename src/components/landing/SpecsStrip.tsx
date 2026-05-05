@@ -7,18 +7,18 @@ const EASE = [0.25, 1, 0.5, 1] as const
 const SPECS = [
     {
         n: '01',
-        title: 'browser-side',
-        body: 'audio is extracted in your browser. the video file never leaves your device — only the transcribed text.',
+        title: 'private',
+        body: 'your video file never leaves your device. we extract the audio, pull the transcript, and delete the rest. only the words stay.',
     },
     {
         n: '02',
-        title: 'free stack',
-        body: 'Groq Whisper for transcription, Llama for drafting, MiniLM for embeddings. no paid keys, no surprises.',
+        title: 'free',
+        body: 'groq whisper for transcription, llama for drafting, miniLM for embeddings. no paid keys, no surprises.',
     },
     {
         n: '03',
-        title: 'open beta',
-        body: 'no credit card. no paywall today. use it, break it, tell us what to fix next.',
+        title: 'early days',
+        body: 'no credit card. use it, break it, tell us what’s wrong.',
     },
 ]
 

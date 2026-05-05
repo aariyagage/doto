@@ -1,6 +1,8 @@
 import Link from 'next/link'
 import { ArrowUpRight } from 'lucide-react'
 import HeroHeadline from '@/components/landing/HeroHeadline'
+import HeroIntro from '@/components/landing/HeroIntro'
+import ProblemSection from '@/components/landing/ProblemSection'
 import WorkspaceShelf from '@/components/landing/WorkspaceShelf'
 import Bento from '@/components/landing/Bento'
 import SpecsStrip from '@/components/landing/SpecsStrip'
@@ -35,27 +37,16 @@ export default function Home() {
                     a creator&rsquo;s content workspace
                 </div>
                 <HeroHeadline />
-                <p className="mt-8 text-body-lg text-ink-muted max-w-2xl text-pretty">
-                    upload your videos. we transcribe them, surface your content pillars, and draft new ideas in your exact voice — filed and ready when you need them.
-                </p>
-                <div className="mt-10 flex flex-wrap items-center gap-x-5 gap-y-3">
-                    <Link
-                        href="/signup"
-                        className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-ink text-paper text-body font-medium hover:bg-ink/90 transition-colors"
-                    >
-                        open your workspace
-                        <ArrowUpRight className="w-4 h-4" strokeWidth={1.75} />
-                    </Link>
-                    <span className="text-body-sm text-ink-faint">
-                        no credit card required.
-                    </span>
-                </div>
+                <HeroIntro />
             </section>
 
-            {/* Workspace shelf — animated stagger */}
+            {/* How it works — folder steps */}
             <WorkspaceShelf />
 
-            {/* Bento — capabilities */}
+            {/* Problem — short narrative */}
+            <ProblemSection />
+
+            {/* Bento — what you can do with it */}
             <Bento />
 
             {/* Specs strip — honest claims */}
@@ -66,18 +57,18 @@ export default function Home() {
                 <div className="border-t border-rule pt-12 md:pt-16 flex flex-col md:flex-row md:items-end md:justify-between gap-8">
                     <div>
                         <h2 className="text-display-2 text-ink">
-                            stop starting<br />
-                            from scratch.
+                            your ideas are<br />
+                            already there.
                         </h2>
-                        <p className="mt-5 text-body-lg text-ink-muted max-w-md">
-                            your workspace is already full of material. doto files it for you.
+                        <p className="mt-5 text-body-lg text-ink-muted max-w-md text-pretty">
+                            you just need somewhere to put them.
                         </p>
                     </div>
                     <Link
                         href="/signup"
                         className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-ink text-paper text-body font-medium hover:bg-ink/90 transition-colors whitespace-nowrap self-start md:self-auto"
                     >
-                        start filing
+                        get started
                         <ArrowUpRight className="w-4 h-4" strokeWidth={1.75} />
                     </Link>
                 </div>

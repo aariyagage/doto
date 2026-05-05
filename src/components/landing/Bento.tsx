@@ -6,38 +6,36 @@ import BentoTile from './BentoTile'
 const EASE = [0.25, 1, 0.5, 1] as const
 
 const PILLAR_CHIPS: { label: string; bg: string; text: string }[] = [
-    { label: 'Productivity',           bg: '#B49C84', text: '#1A1816' }, // dessert cup
-    { label: 'Mindset',                bg: '#D97066', text: '#1A1816' }, // rose petals
-    { label: 'Founder Diaries',        bg: '#CBD0AF', text: '#1A1816' }, // shop window
-    { label: 'Solopreneur Saturdays',  bg: '#481F1F', text: '#FFFFFF' }, // cowboy boots
-    { label: 'Voice',                  bg: '#B49C84', text: '#1A1816' }, // dessert cup
+    { label: 'Productivity',           bg: '#B49C84', text: '#1A1816' },
+    { label: 'Mindset',                bg: '#D97066', text: '#1A1816' },
+    { label: 'Founder Diaries',        bg: '#CBD0AF', text: '#1A1816' },
+    { label: 'Solopreneur Saturdays',  bg: '#481F1F', text: '#FFFFFF' },
+    { label: 'Voice',                  bg: '#B49C84', text: '#1A1816' },
 ]
 
-const IDEA_CARDS = [
+const REFINED_IDEAS = [
     "5 things I'd tell a creator with 1k followers",
     'Why my morning routine takes 8 minutes',
     "The 'consistency' lie",
 ]
 
 /**
- * Tile 1 — animated transcript reveal. Words fade in word-by-word, then two
- * phrases get a manila highlight wipe and a small pillar tag flips in beside
- * them. Conveys "we read every word and surface the themes."
+ * Lead tile — rough thought becoming a structured idea.
+ * The thought types in, two phrases get a manila wipe, and a hook + angle
+ * tag pair flips in below.
  */
-function TranscriptReveal() {
-    const TOKENS: { text: string; highlight?: 'productivity' | 'mindset' }[] = [
-        { text: 'Most' }, { text: 'creators' }, { text: 'think' }, { text: 'you' },
-        { text: 'need' }, { text: 'to' },
-        { text: 'wake up at 5am.', highlight: 'productivity' },
-        { text: "I'm" }, { text: 'gonna' }, { text: 'tell' }, { text: 'you' }, { text: 'why' },
-        { text: "that's broken", highlight: 'mindset' },
-        { text: '— and' }, { text: 'what' }, { text: 'works' }, { text: 'instead.' },
+function ThoughtToIdea() {
+    const TOKENS: { text: string; highlight?: 'hook' | 'angle' }[] = [
+        { text: 'i' }, { text: 'wanna' }, { text: 'make' }, { text: 'a' }, { text: 'video' },
+        { text: 'about' }, { text: 'how' },
+        { text: 'the 5am rule is broken', highlight: 'hook' },
+        { text: 'and' },
+        { text: 'most creators are doing it wrong', highlight: 'angle' },
     ]
 
-    // Per-pillar highlight tints, drawn from the active palette.
     const HIGHLIGHT_BG = {
-        productivity: 'rgba(180, 156, 132, 0.45)', // dessert cup
-        mindset:      'rgba(217, 112, 102, 0.32)', // rose petals
+        hook:  'rgba(180, 156, 132, 0.45)',
+        angle: 'rgba(217, 112, 102, 0.32)',
     } as const
 
     return (
@@ -73,17 +71,16 @@ function TranscriptReveal() {
                 ))}
             </motion.p>
 
-            {/* Pillar tags inferred from the highlighted phrases — match palette */}
             <motion.div
                 initial={{ opacity: 0, y: 8 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true, margin: '-80px' }}
-                transition={{ duration: 0.5, ease: EASE, delay: 1.4 }}
+                transition={{ duration: 0.5, ease: EASE, delay: 1.2 }}
                 className="mt-6 flex flex-wrap gap-2"
             >
                 {[
-                    { label: 'productivity', n: '01', bg: '#B49C84', text: '#1A1816' },
-                    { label: 'mindset',      n: '02', bg: '#D97066', text: '#1A1816' },
+                    { label: 'hook',  n: '01', bg: '#B49C84', text: '#1A1816' },
+                    { label: 'angle', n: '02', bg: '#D97066', text: '#1A1816' },
                 ].map(p => (
                     <span
                         key={p.label}
@@ -101,7 +98,6 @@ function TranscriptReveal() {
     )
 }
 
-/** Tile 2 — pillar chips appearing one by one. */
 function PillarChips() {
     return (
         <motion.div
@@ -129,21 +125,59 @@ function PillarChips() {
     )
 }
 
-/** Tile 3 — voice pull quote. */
-function VoiceQuote() {
+/**
+ * Upload tile — a filename and a small waveform fade in, then a snippet of
+ * the resulting transcript appears below. Conveys "drop in a video, it
+ * understands what you said."
+ */
+function UploadReveal() {
     return (
         <div className="flex-1 flex flex-col justify-between">
-            <p className="text-xl md:text-2xl leading-snug tracking-tight text-ink text-balance">
-                &ldquo;I don&rsquo;t believe in productivity hacks. I believe in showing up tired and doing it anyway.&rdquo;
-            </p>
-            <span className="mt-6 text-caption text-ink-faint">
-                inferred from your transcripts
-            </span>
+            <motion.div
+                initial={{ opacity: 0, y: 8 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, margin: '-50px' }}
+                transition={{ duration: 0.5, ease: EASE }}
+                className="flex flex-col gap-3"
+            >
+                <div className="flex items-center gap-3 px-3 py-2 rounded-md bg-paper border border-rule">
+                    <div className="w-2 h-2 rounded-full bg-ink/40" aria-hidden />
+                    <span className="text-body-sm text-ink-muted truncate">
+                        morning_routine_take2.mp4
+                    </span>
+                </div>
+
+                <div className="flex items-end gap-[3px] h-7 px-1" aria-hidden>
+                    {Array.from({ length: 28 }).map((_, i) => {
+                        const heights = [40, 70, 55, 85, 35, 90, 60, 50, 75, 45, 65, 80, 30, 70, 55, 85, 50, 75, 40, 60, 90, 55, 35, 70, 80, 45, 65, 50]
+                        return (
+                            <motion.span
+                                key={i}
+                                initial={{ scaleY: 0.2, opacity: 0 }}
+                                whileInView={{ scaleY: heights[i] / 100, opacity: 0.7 }}
+                                viewport={{ once: true, margin: '-50px' }}
+                                transition={{ duration: 0.4, ease: EASE, delay: 0.2 + i * 0.015 }}
+                                className="w-[3px] flex-1 bg-ink origin-bottom rounded-sm"
+                            />
+                        )
+                    })}
+                </div>
+            </motion.div>
+
+            <motion.p
+                initial={{ opacity: 0 }}
+                whileInView={{ opacity: 1 }}
+                viewport={{ once: true, margin: '-50px' }}
+                transition={{ duration: 0.5, ease: EASE, delay: 0.9 }}
+                className="text-body-sm text-ink-muted leading-relaxed mt-5 text-pretty"
+            >
+                &ldquo;most creators think you need to wake up at 5am. i&rsquo;m gonna tell you why that&rsquo;s broken&hellip;&rdquo;
+            </motion.p>
         </div>
     )
 }
 
-/** Tile 4 — stack of idea cards. Hover fans them out. */
+/** Refine tile — stack of editable idea cards. Hover fans them out. */
 function IdeaStack() {
     return (
         <motion.div
@@ -153,7 +187,7 @@ function IdeaStack() {
             className="flex-1 flex items-center justify-center pt-4"
         >
             <div className="relative w-full h-32">
-                {IDEA_CARDS.map((idea, i) => {
+                {REFINED_IDEAS.map((idea, i) => {
                     const restRotate = (i - 1) * 2
                     const restY = i * 4
                     const fanRotate = (i - 1) * 6
@@ -180,14 +214,51 @@ function IdeaStack() {
     )
 }
 
-/** Tile 5 — privacy. */
-function PrivacyBlurb() {
+/**
+ * Learn tile — text-led. A simple sequence of three increasingly-specific
+ * suggestion lines fade in to convey "the more you use it, the more it fits
+ * what you actually make."
+ */
+function LearnOverTime() {
+    const LINES = [
+        { text: 'a video about morning routines', tone: 'faint' },
+        { text: 'a video about why early-rising backfires for solo creators', tone: 'muted' },
+        { text: 'a video about the 8-minute morning that fits a maker schedule', tone: 'ink' },
+    ] as const
+
+    const COLOR = {
+        faint: 'text-ink-faint',
+        muted: 'text-ink-muted',
+        ink:   'text-ink',
+    } as const
+
     return (
-        <div className="flex-1 flex flex-col justify-end">
-            <p className="text-body text-ink-muted text-pretty leading-relaxed">
-                Once we extract the transcript, the video file is deleted. We never store the original — only the words it contained.
-            </p>
-        </div>
+        <motion.div
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true, margin: '-50px' }}
+            transition={{ staggerChildren: 0.18, delayChildren: 0.15 }}
+            className="flex-1 flex flex-col justify-end gap-3"
+        >
+            {LINES.map((line, i) => (
+                <motion.div
+                    key={i}
+                    variants={{
+                        hidden: { opacity: 0, x: -6 },
+                        visible: { opacity: 1, x: 0 },
+                    }}
+                    transition={{ duration: 0.5, ease: EASE }}
+                    className="flex items-baseline gap-3"
+                >
+                    <span className="text-caption text-ink-faint tabular-nums">
+                        0{i + 1}
+                    </span>
+                    <span className={`text-body leading-snug ${COLOR[line.tone]}`}>
+                        {line.text}
+                    </span>
+                </motion.div>
+            ))}
+        </motion.div>
     )
 }
 
@@ -196,28 +267,27 @@ export default function Bento() {
         <section className="max-w-6xl mx-auto px-6 md:px-10 pb-24 md:pb-32">
             <header className="flex items-baseline justify-between pb-6 mb-12 md:mb-16 border-b border-rule">
                 <h2 className="text-display-3 text-ink">
-                    what it does for you
+                    what you can do with it
                 </h2>
                 <span className="text-caption text-ink-muted">
                     five things, one workspace
                 </span>
             </header>
 
-            {/* Bento grid — 6-col on desktop, stacks on mobile.
-                Row 1: large transcript tile (4) + pillars tile (2)
-                Row 2: voice (2) + ideas (2) + privacy (2) */}
+            {/* Row 1: lead "shape" tile (4) + organize (2)
+                Row 2: upload (2) + refine (2) + learn (2) */}
             <div className="grid grid-cols-1 md:grid-cols-6 gap-4 md:gap-5">
                 <BentoTile
-                    caption="01 — transcribe"
-                    headline="every word, captured."
+                    caption="01 · shape"
+                    headline="a rough thought becomes a real idea."
                     className="md:col-span-4 md:row-span-1 min-h-[320px]"
                 >
-                    <TranscriptReveal />
+                    <ThoughtToIdea />
                 </BentoTile>
 
                 <BentoTile
-                    caption="02 — surface"
-                    headline="themes, found for you."
+                    caption="02 · organize"
+                    headline="pillars, your way."
                     tab="right"
                     className="md:col-span-2 min-h-[320px]"
                 >
@@ -225,16 +295,16 @@ export default function Bento() {
                 </BentoTile>
 
                 <BentoTile
-                    caption="03 — voice"
-                    headline="your signature, captured."
+                    caption="03 · upload"
+                    headline="upload a video. keep the words."
                     className="md:col-span-2 min-h-[260px]"
                 >
-                    <VoiceQuote />
+                    <UploadReveal />
                 </BentoTile>
 
                 <BentoTile
-                    caption="04 — draft"
-                    headline="ideas, filed."
+                    caption="04 · refine"
+                    headline="edit any idea until it’s right."
                     tab="right"
                     className="md:col-span-2 min-h-[260px]"
                 >
@@ -242,11 +312,11 @@ export default function Bento() {
                 </BentoTile>
 
                 <BentoTile
-                    caption="05 — private"
-                    headline="videos, deleted."
+                    caption="05 · learn"
+                    headline="gets more useful the more you use it."
                     className="md:col-span-2 min-h-[260px]"
                 >
-                    <PrivacyBlurb />
+                    <LearnOverTime />
                 </BentoTile>
             </div>
         </section>

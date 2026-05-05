@@ -14,10 +14,10 @@ const inter = Inter({
 
 export const metadata: Metadata = {
   title: {
-    default: "doto — Your Voice",
+    default: "doto · turn thoughts into content",
     template: "%s · doto",
   },
-  description: "Your brain, quantified via AI.",
+  description: "doto helps creators shape rough thoughts, half-ideas, and old videos into actual content they can post.",
 };
 
 export default function RootLayout({

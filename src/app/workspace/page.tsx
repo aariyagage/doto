@@ -2,15 +2,14 @@
 
 // /workspace — Pillar Workspace.
 //
-// Drag concepts between pillar columns with @dnd-kit. Merge a pillar into
-// another, split selected concepts into a new pillar, rename inline.
+// Drag concepts between pillar columns with @dnd-kit. Merge a pillar
+// into another, split selected concepts into a new pillar, rename inline,
+// discover new pillars from transcripts, delete individual pillars.
+// This is the home for pillar lifecycle (post /ideas retirement).
 //
 // Concepts shown: status in (draft, reviewed, saved). Used / rejected /
 // archived hide here -- the workspace is for the active backlog.
 // Cards link to /concepts/[id] for full edit.
-//
-// Pillar create / delete still happens on /ideas; the workspace is for
-// re-organizing what already exists.
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
@@ -395,7 +394,7 @@ export default function WorkspacePage() {
                         <h3 className="text-title-3 mb-2">no pillars yet</h3>
                         <p className="text-ink-muted text-sm max-w-md mx-auto mb-4">
                             create pillars on{' '}
-                            <a href="/ideas" className="font-semibold text-blue-600 hover:underline">/ideas</a>
+                            <a href="/concepts" className="font-semibold text-blue-600 hover:underline">/concepts</a>
                             {' '}first. once you have pillars and concepts, this workspace lets you drag concepts between them.
                         </p>
                     </div>
